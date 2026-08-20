@@ -14,7 +14,19 @@ local Net = require(Shared.Net)
 local STORE_NAME = "ToiletFarm_v1"
 local AUTOSAVE = 90
 
+-- Session locking. A profile records the JobId that owns it plus a heartbeat.
+-- Another server may only take the profile once that heartbeat has gone stale,
+-- which is what stops two servers from round-tripping the same save and
+-- rolling each other's progress back.
+-- Comfortably longer than one autosave cycle, so a live server that is merely slow
+-- is never mistaken for a dead one. Only a hard crash leaves a lock to time out;
+-- an orderly shutdown releases it through the final save.
+local LOCK_STALE = 240       -- seconds before an unrefreshed lock may be taken
+local LOAD_ATTEMPTS = 6      -- how many times to wait for a live lock to release
+local LOAD_RETRY_WAIT = 5
+
 local store = DataStoreService:GetDataStore(STORE_NAME)
+local JOB_ID = game.JobId ~= "" and game.JobId or ("studio_" .. tostring(os.time()))
 
 -- In Studio with "Enable Studio Access to API Services" off, DataStore calls throw.
 -- Fall back to an in-memory profile there so the game is still playable, but never
@@ -60,6 +72,16 @@ function DataService.default()
 		rateAtLogout  = 0,
 		version       = 1,
 	}
+end
+
+-- SetAsync serialises whatever it is handed at the moment it actually runs, and it
+-- yields. A shallow table.clone shares every nested table with the live profile, so
+-- a mutation landing mid-save writes a torn mixture of two states. Copy deeply.
+local function deepCopy(v)
+	if type(v) ~= "table" then return v end
+	local out = {}
+	for k, inner in pairs(v) do out[k] = deepCopy(inner) end
+	return out
 end
 
 -- fill in anything a newer version added without clobbering saved values
@@ -178,52 +200,128 @@ function DataService.poopRate(player: Player): number
 end
 
 -- ── load / save ───────────────────────────────────────────────────────────
+-- Every write goes through UpdateAsync so the read-modify-write is atomic against
+-- other servers, and so a save can refuse to clobber a profile this server no
+-- longer owns.
+local function lockIsForeign(saved): boolean
+	local lock = saved and saved.lock
+	if type(lock) ~= "table" then return false end
+	if lock.jobId == nil or lock.jobId == JOB_ID then return false end
+	return (os.time() - (tonumber(lock.heartbeat) or 0)) < LOCK_STALE
+end
+
 local function loadProfile(player: Player)
 	loading[player] = true
-	local data
-	local ok, err = pcall(function()
-		data = store:GetAsync(key(player))
-	end)
-	if not ok then
-		if isApiDisabled(err) then
-			if not studioNoApi then
-				studioNoApi = true
-				warn("[DataService] Studio API access is off — running with in-memory saves. " ..
-					"Turn on Game Settings → Security → Enable Studio Access to API Services to test real saving.")
+
+	local data, lastErr
+	local claimed = false
+
+	for attempt = 1, LOAD_ATTEMPTS do
+		local blocked = false
+		local ok, err = pcall(function()
+			data = store:UpdateAsync(key(player), function(saved)
+				if lockIsForeign(saved) then
+					blocked = true
+					return nil            -- leave it alone; another live server owns it
+				end
+				saved = saved or {}
+				saved.lock = { jobId = JOB_ID, heartbeat = os.time() }
+				return saved
+			end)
+		end)
+
+		if ok and not blocked then
+			claimed = true
+			break
+		end
+
+		if not ok then
+			lastErr = err
+			if isApiDisabled(err) then
+				if not studioNoApi then
+					studioNoApi = true
+					warn("[DataService] Studio API access is off — running with in-memory saves. " ..
+						"Turn on Game Settings → Security → Enable Studio Access to API Services to test real saving.")
+				end
+				data = nil
+				claimed = true
+				break
 			end
-			data = nil
-		else
-			warn(("[DataService] load failed for %s: %s"):format(player.Name, tostring(err)))
-			-- Do NOT hand out a fresh profile on a failed read — that overwrites real progress
-			-- on the next autosave. Kick instead and let them rejoin.
+		end
+
+		if player.Parent == nil then
 			loading[player] = nil
-			if player.Parent then
-				player:Kick("Couldn't load your farm. Please rejoin — your progress is safe.")
-			end
 			return nil
 		end
+		if attempt < LOAD_ATTEMPTS then task.wait(LOAD_RETRY_WAIT) end
 	end
+
+	if not claimed then
+		loading[player] = nil
+		if player.Parent then
+			if lastErr then
+				warn(("[DataService] load failed for %s: %s"):format(player.Name, tostring(lastErr)))
+			else
+				warn(("[DataService] profile for %s is still locked by another server"):format(player.Name))
+			end
+			-- Do NOT hand out a fresh profile on a failed read — that overwrites real progress
+			-- on the next autosave. Kick instead and let them rejoin.
+			player:Kick("Couldn't load your farm. Please rejoin — your progress is safe.")
+		end
+		return nil
+	end
+
 	local profile = reconcile(data or {}, DataService.default())
 	profiles[player] = profile
 	loading[player] = nil
 	return profile
 end
 
-function DataService.save(player: Player, isFinal: boolean?)
+-- Hooks other services use to fold their own in-memory state into the profile
+-- immediately before it is written, and to restore it right after a load.
+local serializers: { (Player, any) -> () } = {}
+
+function DataService.onSerialize(fn: (Player, any) -> ())
+	table.insert(serializers, fn)
+end
+
+-- Returns true only when the profile is known to be durably stored.
+function DataService.save(player: Player, isFinal: boolean?): boolean
 	local p = profiles[player]
-	if not p then return end
+	if not p then return false end
+
+	for _, fn in ipairs(serializers) do
+		local ok, err = pcall(fn, player, p)
+		if not ok then warn(("[DataService] serializer failed: %s"):format(tostring(err))) end
+	end
+
 	if isFinal then
 		p.lastLogout = os.time()
 		p.rateAtLogout = DataService.poopRate(player)
 	end
-	if studioNoApi then return end
-	local snapshot = table.clone(p)
-	local ok, err = pcall(function()
-		store:SetAsync(key(player), snapshot)
-	end)
-	if not ok and not isApiDisabled(err) then
-		warn(("[DataService] save failed for %s: %s"):format(player.Name, tostring(err)))
+	if studioNoApi then return true end
+
+	local snapshot = deepCopy(p)
+	snapshot.lock = isFinal and nil or { jobId = JOB_ID, heartbeat = os.time() }
+
+	local lastErr
+	for attempt = 1, 3 do
+		local ok, err = pcall(function()
+			store:UpdateAsync(key(player), function(saved)
+				-- Another server took the profile while we held it. Its data is newer
+				-- than ours; writing now would roll that player back.
+				if lockIsForeign(saved) then return nil end
+				return snapshot
+			end)
+		end)
+		if ok then return true end
+		lastErr = err
+		if isApiDisabled(err) then return true end
+		task.wait(attempt * 2)
 	end
+
+	warn(("[DataService] save failed for %s: %s"):format(player.Name, tostring(lastErr)))
+	return false
 end
 
 function DataService.init()
