@@ -36,9 +36,7 @@ function RateLimiter.consume(player: Player, action: string, burst: number, perS
 		bucket.last = now
 	end
 
-	if bucket.tokens < 1 then
-		return false
-	end
+	if bucket.tokens < 1 then return false end
 	bucket.tokens -= 1
 	return true
 end

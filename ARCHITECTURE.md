@@ -121,6 +121,8 @@ opportunistically "fix" them mid-task — each gets its own change.
 | Pre-existing luau-lsp diagnostics | 3 | `shared/ToiletConfig`, `client/Controllers/{UIKit,Lucky,Index,Popups,Tutorial}` | ~20 nil-safety and unused-import warnings in files untouched by the migration. Fix per-file when next editing them, with `--!strict`. |
 | `TestService.RobloxLSP_Settings` | cosmetic | the place | Editor plugin artifact left in the DataModel. |
 | No automated tests | 3 | — | The deterministic high-risk logic (`ToiletConfig` cost curves, offline maths, `RateLimiter`) is testable and untested. |
+| Tree is not StyLua-formatted | 3 | `src/` | 31 of 34 files differ from `stylua.toml`. The config was tuned to match the existing hand-formatting as closely as it can (`ConditionalOnly`), but a tree-wide `stylua src/` would still be a large diff. Format per-file when next editing one; `src/server/Security` is already clean. |
+| No CI | 3 | — | `selene`, `stylua --check` and `rojo build` all run clean enough to gate on, but nothing runs them automatically. |
 
 ## Verification performed at migration
 
