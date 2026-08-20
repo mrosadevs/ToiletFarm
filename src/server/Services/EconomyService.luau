@@ -319,20 +319,25 @@ function EconomyService.claimOffline(player: Player, doubled: boolean?)
 end
 
 -- ── free money chest ────────────────────────────────────────────────────
-local lastChest: { [Player]: number } = {}
 local CHEST_COOLDOWN = 600
 
+-- The cooldown is stored against wall-clock time in the profile. It used to be
+-- os.clock(), which counts this server's uptime, so hopping to a fresh server
+-- reset the chest instantly and it could be farmed as fast as a player could
+-- rejoin.
 function EconomyService.freeMoney(player: Player)
 	local p = DataService.get(player)
 	if not p then return end
-	local now = os.clock()
-	local last = lastChest[player]
-	if last and now - last < CHEST_COOLDOWN then
+	local now = os.time()
+	local last = tonumber(p.lastChestAt) or 0
+	-- a clock that has moved backwards must not hand out a free claim
+	if last > now then last = now end
+	if last > 0 and now - last < CHEST_COOLDOWN then
 		local left = math.ceil(CHEST_COOLDOWN - (now - last))
 		toast(player, ("Chest refills in %dm %ds"):format(left // 60, left % 60), "error")
 		return
 	end
-	lastChest[player] = now
+	p.lastChestAt = now
 	-- scaled to the player's progress so it stays relevant after rebirths
 	local reward = math.max(250, Config.buyCost(Config.maxBuyableTier(p.rebirths)) * 2)
 	p.cash += reward
@@ -383,7 +388,6 @@ function EconomyService.init()
 		queuePoops[player] = nil
 		queueCash[player] = nil
 		offlineOffer[player] = nil
-		lastChest[player] = nil
 	end)
 
 	-- drain the selling queue

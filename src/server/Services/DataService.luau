@@ -78,6 +78,9 @@ function DataService.default()
 		settings      = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = false, AutoCash = false },
 		stats         = { playtime = 0, totalDeposited = 0, bestCash = 0 },
 		tutorial      = 1,      -- current step index; 0 once finished
+		-- os.time() of the last free-money chest claim. Persisted because an
+		-- uptime-based cooldown resets every time the player changes server.
+		lastChestAt   = 0,
 		lastLogout    = 0,
 		rateAtLogout  = 0,
 		version       = 1,
