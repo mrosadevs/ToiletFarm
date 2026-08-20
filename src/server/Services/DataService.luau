@@ -90,7 +90,7 @@ end
 -- SetAsync serialises whatever it is handed at the moment it actually runs, and it
 -- yields. A shallow table.clone shares every nested table with the live profile, so
 -- a mutation landing mid-save writes a torn mixture of two states. Copy deeply.
-local function deepCopy(v)
+local function deepCopy(v: any): any
 	if type(v) ~= "table" then return v end
 	local out = {}
 	for k, inner in pairs(v) do out[k] = deepCopy(inner) end
@@ -223,7 +223,7 @@ local function lockIsForeign(saved): boolean
 	return (os.time() - (tonumber(lock.heartbeat) or 0)) < LOCK_STALE
 end
 
-local function loadProfile(player: Player)
+local function loadProfile(player: Player): any
 	loading[player] = true
 
 	local data, lastErr
@@ -232,15 +232,16 @@ local function loadProfile(player: Player)
 	for attempt = 1, LOAD_ATTEMPTS do
 		local blocked = false
 		local ok, err = pcall(function()
-			data = store:UpdateAsync(key(player), function(saved)
+			local function claim(saved: any): (any, { number }?, any)
 				if lockIsForeign(saved) then
 					blocked = true
-					return nil            -- leave it alone; another live server owns it
+					return nil, nil, nil   -- leave it alone; another live server owns it
 				end
 				saved = saved or {}
 				saved.lock = { jobId = JOB_ID, heartbeat = os.time() }
-				return saved
-			end)
+				return saved, nil, nil
+			end
+			data = store:UpdateAsync(key(player), claim)
 		end)
 
 		if ok and not blocked then
@@ -292,9 +293,9 @@ end
 
 -- Hooks other services use to fold their own in-memory state into the profile
 -- immediately before it is written, and to restore it right after a load.
-local serializers: { (Player, any) -> () } = {}
+local serializers: { (Player, any) -> any } = {}
 
-function DataService.onSerialize(fn: (Player, any) -> ())
+function DataService.onSerialize(fn: (Player, any) -> any)
 	table.insert(serializers, fn)
 end
 
@@ -315,17 +316,24 @@ function DataService.save(player: Player, isFinal: boolean?): boolean
 	if studioNoApi then return true end
 
 	local snapshot = deepCopy(p)
-	snapshot.lock = isFinal and nil or { jobId = JOB_ID, heartbeat = os.time() }
+	-- `isFinal and nil or {...}` would always pick the table, because `x and nil`
+	-- is nil and nil is falsy. The final save must clear the lock, not refresh it.
+	if isFinal then
+		snapshot.lock = nil
+	else
+		snapshot.lock = { jobId = JOB_ID, heartbeat = os.time() }
+	end
 
 	local lastErr
 	for attempt = 1, 3 do
+		local function commit(saved: any): (any, { number }?, any)
+			-- Another server took the profile while we held it. Its data is newer
+			-- than ours; writing now would roll that player back.
+			if lockIsForeign(saved) then return nil, nil, nil end
+			return snapshot, nil, nil
+		end
 		local ok, err = pcall(function()
-			store:UpdateAsync(key(player), function(saved)
-				-- Another server took the profile while we held it. Its data is newer
-				-- than ours; writing now would roll that player back.
-				if lockIsForeign(saved) then return nil end
-				return snapshot
-			end)
+			store:UpdateAsync(key(player), commit)
 		end)
 		if ok then return true end
 		lastErr = err
@@ -389,7 +397,10 @@ function DataService.init()
 		if RunService:IsStudio() then task.wait(1) else task.wait(3) end
 	end)
 
-	Net.event(Net.NAMES.RequestState).OnServerEvent:Connect(function(player)
+	-- A full push serialises the entire profile, so this is worth a limit even
+	-- though a legitimate client only asks once on join.
+	local RemoteGuard = require(script.Parent.Parent.Security.RemoteGuard)
+	RemoteGuard.handle(Net.NAMES.RequestState, { burst = 5, perSecond = 1 }, function(player)
 		DataService.push(player)
 	end)
 end

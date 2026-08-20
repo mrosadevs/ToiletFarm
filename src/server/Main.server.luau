@@ -10,6 +10,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.ToiletConfig)
 local Net = require(Shared.Net)
 
+local RemoteGuard = require(script.Parent.Security.RemoteGuard)
+
 local Services = script.Parent.Services
 local DataService       = require(Services.DataService)
 local PassService       = require(Services.PassService)
@@ -24,6 +26,7 @@ local TutorialService   = require(Services.TutorialService)
 local CodesService      = require(Services.CodesService)
 local PadService        = require(Services.PadService)
 
+PassService.bindData(DataService)
 PassService.init()
 DataService.init()
 PlotService.init()
@@ -82,34 +85,47 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 -- ── remote handlers ────────────────────────────────────────────────────
+-- Every client-to-server call goes through RemoteGuard, which applies the rate
+-- limit and validates the arguments before the handler is reached. Limits are set
+-- per action: a settings slider legitimately fires far more often than a rebirth,
+-- and a code redemption should be slower than either so the list cannot be
+-- brute-forced.
 local N = Net.NAMES
 
-Net.event(N.Merge).OnServerEvent:Connect(function(player)
-	if not DataService.isLoaded(player) then return end
+local loaded = DataService.isLoaded
+
+RemoteGuard.handle(N.Merge, { burst = 5, perSecond = 2 }, function(player)
+	if not loaded(player) then return end
 	local n = ToiletService.mergeAll(player)
 	if n and n > 0 then TutorialService.notify(player, "merge", 1) end
 end)
 
-Net.event(N.Rebirth).OnServerEvent:Connect(function(player)
-	if not DataService.isLoaded(player) then return end
+RemoteGuard.handle(N.Rebirth, { burst = 3, perSecond = 1 }, function(player)
+	if not loaded(player) then return end
 	EconomyService.rebirth(player)
 end)
 
-Net.event(N.BuyUpgrade).OnServerEvent:Connect(function(player, key)
-	if not DataService.isLoaded(player) then return end
-	if type(key) ~= "string" then return end
+RemoteGuard.handle(N.BuyUpgrade, {
+	burst = 12, perSecond = 6,
+	args = { RemoteGuard.string({ maxLength = 32 }) },
+}, function(player, key)
+	if not loaded(player) then return end
 	EconomyService.buyUpgrade(player, key)
 end)
 
-Net.event(N.BuyTokenPerk).OnServerEvent:Connect(function(player, id)
-	if not DataService.isLoaded(player) then return end
-	if type(id) ~= "string" then return end
+RemoteGuard.handle(N.BuyTokenPerk, {
+	burst = 12, perSecond = 6,
+	args = { RemoteGuard.string({ maxLength = 32 }) },
+}, function(player, id)
+	if not loaded(player) then return end
 	EconomyService.buyPerk(player, id)
 end)
 
-Net.event(N.OpenLucky).OnServerEvent:Connect(function(player, blockUid, useRobux)
-	if not DataService.isLoaded(player) then return end
-	if type(blockUid) ~= "string" then return end
+RemoteGuard.handle(N.OpenLucky, {
+	burst = 5, perSecond = 2,
+	args = { RemoteGuard.string({ maxLength = 64 }), RemoteGuard.optional(RemoteGuard.boolean()) },
+}, function(player, blockUid, useRobux)
+	if not loaded(player) then return end
 	if useRobux then
 		-- charge through a dev product; the handler below finishes the open
 		local p = DataService.get(player)
@@ -128,22 +144,31 @@ Net.event(N.OpenLucky).OnServerEvent:Connect(function(player, blockUid, useRobux
 	end
 end)
 
-Net.event(N.DiscardLucky).OnServerEvent:Connect(function(player, blockUid)
-	if not DataService.isLoaded(player) then return end
-	if type(blockUid) ~= "string" then return end
+RemoteGuard.handle(N.DiscardLucky, {
+	burst = 5, perSecond = 2,
+	args = { RemoteGuard.string({ maxLength = 64 }) },
+}, function(player, blockUid)
+	if not loaded(player) then return end
 	LuckyBlockService.discard(player, blockUid)
 end)
 
-Net.event(N.RedeemCode).OnServerEvent:Connect(function(player, code)
-	if not DataService.isLoaded(player) then return end
-	if type(code) ~= "string" or #code > 40 then return end
+-- Slow on purpose. The code list is short and guessable, so the limit is what
+-- stops it being enumerated rather than the secrecy of the codes themselves.
+RemoteGuard.handle(N.RedeemCode, {
+	burst = 3, perSecond = 0.2,
+	args = { RemoteGuard.string({ maxLength = 40 }) },
+}, function(player, code)
+	if not loaded(player) then return end
 	CodesService.redeem(player, code)
 end)
 
-Net.event(N.SetSetting).OnServerEvent:Connect(function(player, key, value)
+RemoteGuard.handle(N.SetSetting, {
+	-- volume sliders fire continuously while dragged
+	burst = 30, perSecond = 15,
+	args = { RemoteGuard.string({ maxLength = 32 }), RemoteGuard.scalar() },
+}, function(player, key, value)
 	local p = DataService.get(player)
 	if not p then return end
-	if type(key) ~= "string" then return end
 	local current = p.settings[key]
 	if current == nil then return end
 	if type(current) == "number" and type(value) == "number" then
@@ -156,21 +181,20 @@ Net.event(N.SetSetting).OnServerEvent:Connect(function(player, key, value)
 	DataService.push(player, { settings = p.settings })
 end)
 
--- the Home button on the HUD: put the player back on their own island
-local lastHome: { [Player]: number } = {}
-Net.event(N.TeleportHome).OnServerEvent:Connect(function(player)
-	if not DataService.isLoaded(player) then return end
-	local now = os.clock()
-	if lastHome[player] and now - lastHome[player] < 1 then return end
-	lastHome[player] = now
+-- the Home button on the HUD: put the player back on their own island.
+-- The hand-rolled 1s debounce this used to carry is now the rate limit.
+RemoteGuard.handle(N.TeleportHome, { burst = 2, perSecond = 1 }, function(player)
+	if not loaded(player) then return end
 	PlotService.teleportToPlot(player)
 end)
 
-Players.PlayerRemoving:Connect(function(player) lastHome[player] = nil end)
-
-Net.event(N.ClaimOffline).OnServerEvent:Connect(function(player, doubled)
-	if not DataService.isLoaded(player) then return end
-	-- the x2 path must go through a purchase, never a client-supplied flag
+RemoteGuard.handle(N.ClaimOffline, {
+	burst = 3, perSecond = 1,
+	args = { RemoteGuard.optional(RemoteGuard.boolean()) },
+}, function(player)
+	if not loaded(player) then return end
+	-- the x2 path must go through a purchase, never a client-supplied flag, so the
+	-- argument is accepted for wire compatibility and deliberately ignored
 	EconomyService.claimOffline(player, false)
 end)
 

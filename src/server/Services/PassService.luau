@@ -11,6 +11,15 @@ local Prices = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Pr
 
 local PassService = {}
 
+-- Injected by Main rather than required. DataService already reaches into
+-- PassService for pass ownership, so requiring it back here would make the two
+-- modules mutually dependent.
+local DataService: any = nil
+
+function PassService.bindData(service: any)
+	DataService = service
+end
+
 -- name -> gamepass id. This is the complete list; there are no other passes.
 PassService.PASSES = {
 	AutoFlush  = 1949349575,  -- "Auto Collect Poops"
@@ -216,8 +225,7 @@ function PassService.init()
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
 
-		local DataService = require(script.Parent.DataService)
-		local profile = DataService.get(player)
+		local profile = DataService and DataService.get(player)
 		if not profile then
 			-- profile still loading, or the load failed; retry rather than grant blind
 			return Enum.ProductPurchaseDecision.NotProcessedYet
