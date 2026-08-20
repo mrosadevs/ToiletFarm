@@ -26,6 +26,14 @@ PassService.PASSES = {
 	AutoCash   = 1948857557,  -- "Auto Collect Cash"
 	DoublePoop = 1949439531,  -- "Double Poops" — x2 poop value
 	DoubleCash = 1948365646,  -- "x2 Cash" — doubles cash on deposit
+
+	-- ⚠ Referenced by live code but not yet created on the site. A zero id reads as
+	--   "nobody owns it", which is why the AutoMerge pad answers "Coming soon!" and
+	--   why the extended offline cap never applies. Declared here so both are
+	--   visible in the one place ids are filled in, rather than being a name that
+	--   silently misses the table.
+	AutoMerge      = 0,       -- ToiletService auto-merge, AutoMergePad
+	ExtendedSeptic = 0,       -- raises the offline earnings cap (EconomyService)
 }
 
 -- name -> dev product id. This is the complete list; there are no other products.

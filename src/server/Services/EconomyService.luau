@@ -27,8 +27,11 @@ local pending: { [Player]: number } = {}
 -- the selling queue: poop deposited but not yet sold, and the cash it will become
 local queuePoops: { [Player]: number } = {}
 local queueCash:  { [Player]: number } = {}
--- what the offline modal is currently offering, so Claim can't be replayed for more
+-- What the offline modal is currently offering, so Claim can't be replayed for more.
+-- `offlineClaimed` keeps the amount after a plain claim so that a DoubleOffline
+-- purchase arriving afterwards can still pay the second half.
 local offlineOffer: { [Player]: number } = {}
+local offlineClaimed: { [Player]: number } = {}
 
 function EconomyService.pendingCash(player: Player): number
 	return pending[player] or 0
@@ -316,15 +319,39 @@ function EconomyService.reportOffline(player: Player)
 	if poops <= 0 then return end
 
 	offlineOffer[player] = poops
+	offlineClaimed[player] = nil
 	OfflineEvent:FireClient(player, { poops = poops, seconds = math.min(away, hasPass and Config.OFFLINE_CAP_PASS or Config.OFFLINE_CAP) })
 end
 
+-- `doubled` is only ever passed by the DoubleOffline receipt handler, never by the
+-- client. Claiming normally used to clear the offer outright, so a player who hit
+-- Claim and then bought the x2 left the receipt with nothing to grant — it returned
+-- nil, ProcessReceipt answered NotProcessedYet, and Roblox retried that forever.
+-- The claimed amount is now remembered so the purchase can pay the missing half.
 function EconomyService.claimOffline(player: Player, doubled: boolean?)
 	local p = DataService.get(player)
-	local amount = offlineOffer[player]
-	if not p or not amount then return end
+	if not p then return end
+
+	local amount
+	if doubled then
+		if offlineOffer[player] then
+			-- bought before claiming: pay both halves at once
+			amount = offlineOffer[player] * 2
+		elseif offlineClaimed[player] then
+			-- already claimed at 1x: pay only the bonus half
+			amount = offlineClaimed[player]
+		end
+		-- either way the doubling is spent, so a second purchase cannot re-double
+		offlineClaimed[player] = nil
+	else
+		amount = offlineOffer[player]
+		if amount then offlineClaimed[player] = amount end
+	end
+
 	offlineOffer[player] = nil
-	if doubled then amount *= 2 end
+	-- Nothing outstanding. Returning falsy keeps ProcessReceipt on NotProcessedYet,
+	-- which leaves the purchase uncharged rather than taking Robux for nothing.
+	if not amount or amount <= 0 then return end
 
 	-- The offline pile arrives as one lump of value rather than as individual poops,
 	-- so it bypasses the item cap by design — the player still has to walk it to the
@@ -404,6 +431,7 @@ function EconomyService.init()
 		queuePoops[player] = nil
 		queueCash[player] = nil
 		offlineOffer[player] = nil
+		offlineClaimed[player] = nil
 	end)
 
 	recountFriends()
