@@ -342,8 +342,43 @@ function EconomyService.freeMoney(player: Player)
 	return reward
 end
 
+-- ── persistence ──────────────────────────────────────────────────────────
+-- Banked cash and the selling queue used to live only in these tables, so logging
+-- out with a full basket deposited and still processing silently destroyed all of
+-- it. They are part of the player's balance and belong in the profile.
+local function restore(player: Player)
+	local p = DataService.get(player)
+	if not p then return end
+	pending[player]    = tonumber(p.pendingCash) or 0
+	queuePoops[player] = tonumber(p.queuePoops) or 0
+	queueCash[player]  = tonumber(p.queueCash) or 0
+end
+
+local function capture(player: Player, p)
+	p.pendingCash = pending[player] or 0
+	p.queuePoops  = queuePoops[player] or 0
+	p.queueCash   = queueCash[player] or 0
+end
+
 function EconomyService.init()
+	DataService.onSerialize(capture)
+
+	Players.PlayerAdded:Connect(function(player)
+		-- DataService loads the profile on its own PlayerAdded; wait for it rather
+		-- than racing it, or the restore reads a profile that is not there yet.
+		local deadline = os.clock() + 30
+		while not DataService.isLoaded(player) and os.clock() < deadline and player.Parent do
+			task.wait(0.1)
+		end
+		if DataService.isLoaded(player) then restore(player) end
+	end)
+	for _, player in ipairs(Players:GetPlayers()) do
+		if DataService.isLoaded(player) then restore(player) end
+	end
+
 	Players.PlayerRemoving:Connect(function(player)
+		-- DataService.save(player, true) runs the serializer before writing, so the
+		-- numbers are already captured by the time these are cleared.
 		pending[player] = nil
 		queuePoops[player] = nil
 		queueCash[player] = nil

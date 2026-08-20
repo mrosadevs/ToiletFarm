@@ -60,6 +60,12 @@ function DataService.default()
 
 		toilets       = {},     -- { {tier=n, mut="None", slot=n}, ... }
 		processing    = 0,      -- selling-rate level, wiped on rebirth
+		-- Cash that finished processing and is waiting on the Collect Cash pad, plus
+		-- the selling queue still draining. EconomyService owns these at runtime and
+		-- folds them back in through DataService.onSerialize before every save.
+		pendingCash   = 0,
+		queuePoops    = 0,
+		queueCash     = 0,
 		upgrades      = upgrades,
 		perks         = perks,
 		discovered    = {},     -- ["T01_PorcelainStarter"] = true
