@@ -157,6 +157,24 @@ function PassService.publishPrices()
 	return checked, drifted
 end
 
+-- Keep the ledger bounded. Roblox gives up on a receipt long before a player could
+-- accumulate this many, so the oldest entries are safe to forget.
+local RECEIPT_HISTORY = 200
+
+function PassService.trimReceipts(profile)
+	local receipts = profile.receipts
+	if type(receipts) ~= "table" then return end
+	local keys = {}
+	for k in pairs(receipts) do table.insert(keys, k) end
+	if #keys <= RECEIPT_HISTORY then return end
+	table.sort(keys, function(a, b)
+		return (tonumber(receipts[a]) or 0) < (tonumber(receipts[b]) or 0)
+	end)
+	for i = 1, #keys - RECEIPT_HISTORY do
+		receipts[keys[i]] = nil
+	end
+end
+
 function PassService.init()
 	PassService.prefetchPrices()
 
@@ -184,12 +202,33 @@ function PassService.init()
 		end
 	end)
 
+	-- Roblox retries a receipt until it is told PurchaseGranted, and it may retry one
+	-- it has already delivered. Two rules keep that honest:
+	--   * a PurchaseId already in the player's ledger is granted again immediately,
+	--     without re-running the handler, so a retry can never pay out twice;
+	--   * PurchaseGranted is only returned once the ledger entry is durably saved,
+	--     because that answer permanently retires the receipt. Reporting success on
+	--     a grant that only exists in memory is how a player pays and gets nothing.
 	MarketplaceService.ProcessReceipt = function(receipt)
 		local player = Players:GetPlayerByUserId(receipt.PlayerId)
 		if not player then
 			-- they left mid-purchase; tell Roblox to retry on their next join
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
+
+		local DataService = require(script.Parent.DataService)
+		local profile = DataService.get(player)
+		if not profile then
+			-- profile still loading, or the load failed; retry rather than grant blind
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+
+		local purchaseKey = tostring(receipt.PurchaseId)
+		profile.receipts = profile.receipts or {}
+		if profile.receipts[purchaseKey] then
+			return Enum.ProductPurchaseDecision.PurchaseGranted
+		end
+
 		for name, id in pairs(PassService.PRODUCTS) do
 			if id == receipt.ProductId then
 				local handler = productHandlers[name]
@@ -197,11 +236,30 @@ function PassService.init()
 					warn("[PassService] no handler for product " .. name)
 					return Enum.ProductPurchaseDecision.NotProcessedYet
 				end
+
 				local ok, granted = pcall(handler, player)
-				if ok and granted then
-					return Enum.ProductPurchaseDecision.PurchaseGranted
+				if not ok then
+					warn(("[PassService] handler for %s errored: %s"):format(name, tostring(granted)))
+					return Enum.ProductPurchaseDecision.NotProcessedYet
 				end
-				return Enum.ProductPurchaseDecision.NotProcessedYet
+				if not granted then
+					return Enum.ProductPurchaseDecision.NotProcessedYet
+				end
+
+				profile.receipts[purchaseKey] = os.time()
+				PassService.trimReceipts(profile)
+
+				if not DataService.save(player) then
+					-- The grant is real but not yet durable. Roll the ledger entry back and
+					-- let Roblox retry; the handler stays un-run so the retry re-grants.
+					profile.receipts[purchaseKey] = nil
+					warn(("[PassService] could not persist receipt %s for %s; asking for a retry")
+						:format(purchaseKey, player.Name))
+					return Enum.ProductPurchaseDecision.NotProcessedYet
+				end
+
+				print(("[PassService] %s purchased %s (receipt %s)"):format(player.Name, name, purchaseKey))
+				return Enum.ProductPurchaseDecision.PurchaseGranted
 			end
 		end
 		return Enum.ProductPurchaseDecision.NotProcessedYet

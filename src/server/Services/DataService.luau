@@ -65,6 +65,10 @@ function DataService.default()
 		discovered    = {},     -- ["T01_PorcelainStarter"] = true
 		luckyInv      = {},     -- { {id="Basic", uid="..."} }
 		codes         = {},
+		-- PurchaseIds already granted, so a retried receipt is never paid out twice.
+		-- Trimmed to the newest RECEIPT_HISTORY entries; Roblox stops retrying long
+		-- before a player could push that many purchases through.
+		receipts      = {},
 		settings      = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = false, AutoCash = false },
 		stats         = { playtime = 0, totalDeposited = 0, bestCash = 0 },
 		tutorial      = 1,      -- current step index; 0 once finished
