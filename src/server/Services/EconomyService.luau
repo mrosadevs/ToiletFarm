@@ -39,15 +39,31 @@ function EconomyService.queued(player: Player): (number, number)
 end
 
 -- friends in this server drive the sign's "(No Friend Boost)" line
-function EconomyService.friendsInServer(player: Player): number
-	local n = 0
-	for _, other in ipairs(Players:GetPlayers()) do
-		if other ~= player then
-			local ok, isFriend = pcall(function() return player:IsFriendsWith(other.UserId) end)
-			if ok and isFriend then n += 1 end
-		end
+--
+-- IsFriendsWith is a web call. This used to be recomputed for every player on every
+-- Heartbeat, which meant a yielding request per pair of players 60 times a second.
+-- The answer can only change when somebody joins or leaves, so it is computed then
+-- and read from the cache everywhere else.
+local friendCache: { [Player]: number } = {}
+
+local function recountFriends()
+	local players = Players:GetPlayers()
+	for _, player in ipairs(players) do
+		task.spawn(function()
+			local n = 0
+			for _, other in ipairs(players) do
+				if other ~= player then
+					local ok, isFriend = pcall(function() return player:IsFriendsWith(other.UserId) end)
+					if ok and isFriend then n += 1 end
+				end
+			end
+			if player.Parent then friendCache[player] = n end
+		end)
 	end
-	return n
+end
+
+function EconomyService.friendsInServer(player: Player): number
+	return friendCache[player] or 0
 end
 
 function EconomyService.processRate(player: Player): number
@@ -390,10 +406,29 @@ function EconomyService.init()
 		offlineOffer[player] = nil
 	end)
 
-	-- drain the selling queue
+	recountFriends()
+	Players.PlayerAdded:Connect(recountFriends)
+	Players.PlayerRemoving:Connect(function(player)
+		friendCache[player] = nil
+		task.defer(recountFriends)
+	end)
+
+	-- Drain the selling queue.
+	--
+	-- This is an economic process, not a visual one, so it does not need to run at
+	-- frame rate: each tick sells rate * elapsed, and accumulating the elapsed time
+	-- over a fifth of a second sells exactly as much as twelve frame-sized ticks
+	-- would have. Doing it per frame meant rebuilding every player's full toilet
+	-- rate table 60 times a second for no additional accuracy.
+	local TICK = 0.2
+	local accumulated = 0
 	RunService.Heartbeat:Connect(function(dt)
+		accumulated += dt
+		if accumulated < TICK then return end
+		local elapsed = accumulated
+		accumulated = 0
 		for _, player in ipairs(Players:GetPlayers()) do
-			tickQueue(player, dt)
+			tickQueue(player, elapsed)
 		end
 	end)
 
