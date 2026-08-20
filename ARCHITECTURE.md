@@ -2,6 +2,7 @@
 
 What this game **is right now**, including the parts that are not good yet.
 For rules that apply to every change, see `CLAUDE.md`.
+For how it got here session by session, see `HISTORY.md`.
 
 ## Migration status
 
