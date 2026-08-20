@@ -1,0 +1,23 @@
+--!strict
+return {
+	Music        = "rbxassetid://125114204214284",
+	UiClick      = "rbxassetid://88442833509532",
+	UiClose      = "rbxassetid://74657965144290",
+	UiOpen       = "rbxassetid://127877437691780",
+	UiHover      = "rbxassetid://136108770017536",
+	Error        = "rbxassetid://106796270505945",
+	Flush        = "rbxassetid://105807534529585",
+	PoopPlop     = "rbxassetid://773858658",
+	PoopDeposit  = "rbxassetid://126299569664361",
+	MoneyCollect = "rbxassetid://5613553529",
+	MoneySpend   = "rbxassetid://131875549436395",
+	Confetti     = "rbxassetid://109081723292068",
+	Hooray       = "rbxassetid://75247400023234",
+	Merge        = "rbxassetid://85132289764366",
+	Rebirth      = "rbxassetid://116975598122611",
+	LuckyOpen    = "rbxassetid://90864973986637",
+	LuckySpawn   = "rbxassetid://140594092271010",
+	Discovery    = "rbxassetid://138891370077088",
+	FootstepL    = "rbxassetid://106672010112184",
+	FootstepR    = "rbxassetid://82667401006591",
+}

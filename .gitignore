@@ -1,0 +1,14 @@
+# Place files — never the source of truth; the filesystem is.
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
+
+# Generated
+sourcemap.json
+build/
+/*.rbxm
+
+# Tooling
+.DS_Store
+.vscode/settings.json.bak

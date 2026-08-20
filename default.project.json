@@ -1,0 +1,26 @@
+{
+  "name": "ToiletFarm",
+  "globIgnorePaths": ["**/.DS_Store"],
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared",
+        "$ignoreUnknownInstances": false
+      }
+    },
+
+    "ServerScriptService": {
+      "$path": "src/server",
+      "$ignoreUnknownInstances": false
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "$path": "src/client",
+        "$ignoreUnknownInstances": false
+      }
+    }
+  }
+}
