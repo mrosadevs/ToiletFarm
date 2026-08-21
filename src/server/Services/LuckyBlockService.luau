@@ -14,6 +14,7 @@ local Net = require(Shared.Net)
 local DataService = require(script.Parent.DataService)
 local PlotService = require(script.Parent.PlotService)
 local ToiletService = require(script.Parent.ToiletService)
+local PoopService = require(script.Parent.PoopService)
 local IndexService = require(script.Parent.IndexService)
 
 local BlockModels = ServerStorage.Assets:WaitForChild("LuckyBlocks")
@@ -83,7 +84,10 @@ function LuckyBlockService.spawnOnPlot(player: Player, blockId: string?)
 	end
 	if #owned == 0 then return end   -- nothing to come out of yet
 	local fromToilet = owned[math.random(#owned)]
-	local pos = fromToilet:GetPivot().Position
+	-- Onto the belt, at the exact point a poop appears. This used to be the toilet's
+	-- own pivot, which is INSIDE the stall, so a 2.5 stud block spawned wedged under
+	-- the model and never reached the belt. The extra lift clears the belt surface.
+	local pos = PoopService.dropPoint(plot, fromToilet:GetPivot().Position) + Vector3.new(0, 1.5, 0)
 
 	local model = source:Clone()
 	model.Name = "LuckyBlock"
