@@ -10,6 +10,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.ToiletConfig)
 local Format = require(Shared.Format)
 local Net = require(Shared.Net)
+local Prices = require(Shared.Prices)
 
 local MarketplaceService = game:GetService("MarketplaceService")
 
@@ -95,24 +96,19 @@ local function refresh(data: any, changed: any)
 	end
 	refreshPacks(data.cash)
 
-	-- Show what you are CARRYING against the cap, not the accumulated cash value.
-	-- The basket used to print p.poops (value) while the cap and the FULL! title are
-	-- both counted in p.poopItems, so a basket reading "1.72K" would bank as
-	-- "Deposited 60 Poops!" and look like the game had eaten the difference.
+	-- How many poops you are carrying. There is no cap any more, so this is a plain
+	-- count -- not the accumulated cash value, which is what made a basket reading
+	-- "1.72K" bank as "Deposited 60 Poops!" and look like the game ate the difference.
 	local poops = find("PoopsAmount") :: TextLabel?
 	if poops then
-		local items = data.poopItems or 0
-		local cap = data.carryCap or 25
-		poops.Text = ("%s/%s"):format(Format.short(items), Format.short(cap))
+		poops.Text = Format.short(data.poopItems or 0)
 		if changed.poopItems or changed.poops then UIKit.pop(poops, 1.12) end
 	end
 
-	-- basket header doubles as the carry gauge
 	local poopsTitle = find("PoopsTitle") :: TextLabel?
 	if poopsTitle then
-		local full = (data.poopItems or 0) >= (data.carryCap or 25)
-		poopsTitle.Text = full and "FULL!" or "Poops"
-		poopsTitle.TextColor3 = full and Color3.fromRGB(255, 120, 120) or Color3.new(1, 1, 1)
+		poopsTitle.Text = "Poops"
+		poopsTitle.TextColor3 = Color3.new(1, 1, 1)
 	end
 
 	local rebirth = find("RebirthCounter") :: TextLabel?
@@ -130,14 +126,11 @@ local function refresh(data: any, changed: any)
 		total.Text = "Total Toilets: " .. Format.short(n)
 	end
 
-	-- Name the unit. This counter sits directly under the x2 Cash badge behind a coin
-	-- glyph, so a bare "1" read as that button's price -- hence the "says 1 robux
-	-- instead of 12" report. These are Flush Tokens (the perk currency), not Robux.
+	-- This row sits directly beneath the x2 Cash badge behind a Robux glyph, so it
+	-- reads as that button's price and nothing else will ever be read into it. Show
+	-- the gamepass price, which is what it looked like it was showing all along.
 	local robux = find("RobuxAmount") :: TextLabel?
-	if robux then
-		local n = data.tokens or 0
-		robux.Text = ("%s Token%s"):format(Format.comma(n), n == 1 and "" or "s")
-	end
+	if robux then robux.Text = Prices.text("pass", "DoubleCash") end
 
 	-- the small line by the cash bar: what you actually earn right now
 	local multText = find("CashMultiplierText") :: TextLabel?
@@ -171,13 +164,12 @@ function Hud.init()
 	-- hologram over the hub leaderboards where everyone reads the same number --
 	-- see WorldFx.buildFlushHologram.
 
-	-- the token row is authored 71px wide and clipping, which fits "11" and nothing
-	-- else; let it grow now that the label names its unit
-	local tokenRow = C:FindFirstChild("RobuxRow")
-	if tokenRow and tokenRow:IsA("GuiObject") then
-		tokenRow.ClipsDescendants = false
-		tokenRow.AutomaticSize = Enum.AutomaticSize.X
-		local amount = tokenRow:FindFirstChild("RobuxAmount")
+	-- the price row is authored 71px wide and clipping, which fits two digits
+	local priceRow = C:FindFirstChild("RobuxRow")
+	if priceRow and priceRow:IsA("GuiObject") then
+		priceRow.ClipsDescendants = false
+		priceRow.AutomaticSize = Enum.AutomaticSize.X
+		local amount = priceRow:FindFirstChild("RobuxAmount")
 		if amount and amount:IsA("TextLabel") then
 			amount.AutomaticSize = Enum.AutomaticSize.X
 			amount.Size = UDim2.fromOffset(0, amount.AbsoluteSize.Y)

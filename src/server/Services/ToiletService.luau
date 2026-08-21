@@ -323,7 +323,6 @@ function ToiletService.init()
 			local speed = 1 - 0.03 * (p.upgrades.FlushSpeed or 0)
 			local valueUp = 1 + 0.10 * (p.upgrades.PoopValue or 0)
 			local mult = DataService.incomeMultiplier(player)
-			local atCap = p.poopItems >= DataService.carryCap(player)
 
 			for _, entry in ipairs(p.toilets) do
 				local left = t[entry.slot]
@@ -334,16 +333,14 @@ function ToiletService.init()
 				left -= dt
 				if left <= 0 then
 					t[entry.slot] = Config.dropInterval(entry.tier) * speed
-					-- toilets keep running at the carry cap, they just stop littering,
-					-- which is what sends the player to the Septic Tank
-					if not atCap then
-						local model = PlotService.toiletModel(plot, entry.slot)
-						if model then
-							local value = Config.poopValue(entry.tier) * valueUp
-								* (Config.MUTATIONS[entry.mut] or 1) * mult
-							local cf = model:GetPivot()
-							PoopService.drop(plot, cf.Position, entry.tier, entry.mut, value)
-						end
+					-- There is no carry cap any more, so toilets always litter. The
+					-- world-poop population is still bounded per plot in PoopService.drop.
+					local model = PlotService.toiletModel(plot, entry.slot)
+					if model then
+						local value = Config.poopValue(entry.tier) * valueUp
+							* (Config.MUTATIONS[entry.mut] or 1) * mult
+						local cf = model:GetPivot()
+						PoopService.drop(plot, cf.Position, entry.tier, entry.mut, value)
 					end
 				else
 					t[entry.slot] = left

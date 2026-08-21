@@ -273,8 +273,11 @@ end
 
 -- ── Flush Meter ─────────────────────────────────────────────────────────────
 Config.FLUSH_METER = {
-	period = 30,          -- seconds between re-rolls
-	warn   = 5,           -- countdown shown before the re-roll
+	-- Slow. At 30s the hologram bar was visibly racing and the number changed before
+	-- a player could do anything about it, which makes it noise rather than a thing
+	-- you plan a run around.
+	period = 150,         -- seconds between re-rolls
+	warn   = 15,          -- countdown shown before the re-roll
 	table  = {
 		{ mult = 0.5,  weight = 10 },
 		{ mult = 0.75, weight = 15 },

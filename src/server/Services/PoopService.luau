@@ -1,7 +1,8 @@
 --!strict
 -- PoopService — world poop instances and the pickup loop.
--- Poop accumulates on the floor; walking near it collects it into your carry pile,
--- which is capped, which is what forces the run to the Septic Tank.
+-- Poop accumulates on the floor and walking near it collects it into your carry
+-- pile. There is no cap on that pile; the only bound is the world-poop population
+-- per plot, which drop() trims so a farm never fills up with physics parts.
 
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
@@ -586,14 +587,9 @@ end
 function PoopService.collect(player: Player, poops: { BasePart }, animate: boolean?)
 	local profile = DataService.get(player)
 	if not profile or #poops == 0 then return end
-	-- the cap counts poops, not their value
-	local cap = DataService.carryCap(player)
-	local room = cap - profile.poopItems
-	if room <= 0 then return end
 
 	local gained, taken = 0, {}
 	for _, p in ipairs(poops) do
-		if #taken >= room then break end
 		-- already flying into someone; do not pay for it twice
 		if not p:GetAttribute("Collected") then
 			local v = p:GetAttribute("Value") or 0
@@ -616,7 +612,7 @@ function PoopService.collect(player: Player, poops: { BasePart }, animate: boole
 			e.part:Destroy()
 		end
 	end
-	PickupEvent:FireClient(player, payload, profile.poops, profile.poopItems, cap)
+	PickupEvent:FireClient(player, payload, profile.poops, profile.poopItems)
 	DataService.push(player, { poops = profile.poops, poopItems = profile.poopItems })
 
 	-- advances the "Collect N Poops" tutorial step

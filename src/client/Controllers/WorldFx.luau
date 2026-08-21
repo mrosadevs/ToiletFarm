@@ -327,10 +327,12 @@ function WorldFx.buildFlushHologram()
 
 	local board = Instance.new("BillboardGui")
 	board.Name = "FlushHologram"
-	board.Size = UDim2.fromOffset(760, 250)
+	-- Sized in STUDS, not pixels: an offset-sized billboard is enormous up close and
+	-- swallowed the middle of the screen. The leaderboards below it are ~13 studs
+	-- wide, so this sits at about their width.
+	board.Size = UDim2.fromScale(14, 4.6)
 	board.StudsOffsetWorldSpace = Vector3.new(0, 0, 0)
-	-- big enough to read from anywhere in the hub, and it should never punch through
-	-- the world from another island
+	-- it should never punch through the world from another island
 	board.MaxDistance = 400
 	board.LightInfluence = 0
 	board.AlwaysOnTop = false
@@ -341,7 +343,7 @@ function WorldFx.buildFlushHologram()
 	panel.BackgroundColor3 = Color3.fromRGB(20, 40, 70)
 	panel.BackgroundTransparency = 0.35
 	panel.BorderSizePixel = 0
-	local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0, 26); pc.Parent = panel
+	local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0.14, 0); pc.Parent = panel
 	local ps = Instance.new("UIStroke")
 	ps.Thickness = 4
 	ps.Color = Color3.fromRGB(120, 230, 255)
@@ -349,9 +351,10 @@ function WorldFx.buildFlushHologram()
 	ps.Parent = panel
 	panel.Parent = board
 
+	-- everything below is laid out in SCALE so it follows the stud-sized billboard
 	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -40, 0, 58)
-	title.Position = UDim2.fromOffset(20, 16)
+	title.Size = UDim2.fromScale(0.92, 0.21)
+	title.Position = UDim2.fromScale(0.04, 0.06)
 	title.BackgroundTransparency = 1
 	title.Font = Enum.Font.FredokaOne
 	title.TextScaled = true
@@ -362,8 +365,8 @@ function WorldFx.buildFlushHologram()
 
 	local value = Instance.new("TextLabel")
 	value.Name = "Value"
-	value.Size = UDim2.new(1, -40, 0, 96)
-	value.Position = UDim2.fromOffset(20, 70)
+	value.Size = UDim2.fromScale(0.92, 0.38)
+	value.Position = UDim2.fromScale(0.04, 0.25)
 	value.BackgroundTransparency = 1
 	value.Font = Enum.Font.FredokaOne
 	value.TextScaled = true
@@ -374,8 +377,8 @@ function WorldFx.buildFlushHologram()
 
 	local track = Instance.new("Frame")
 	track.AnchorPoint = Vector2.new(0.5, 0)
-	track.Position = UDim2.new(0.5, 0, 0, 174)
-	track.Size = UDim2.fromOffset(600, 48)
+	track.Position = UDim2.fromScale(0.5, 0.68)
+	track.Size = UDim2.fromScale(0.86, 0.22)
 	track.BackgroundColor3 = Color3.fromRGB(16, 24, 38)
 	track.BorderSizePixel = 0
 	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(1, 0); tc.Parent = track
@@ -408,7 +411,7 @@ function WorldFx.buildFlushHologram()
 	timer.Text = ""
 	timer.ZIndex = 3
 	local tp = Instance.new("UIPadding")
-	tp.PaddingTop = UDim.new(0, 9); tp.PaddingBottom = UDim.new(0, 9)
+	tp.PaddingTop = UDim.new(0.16, 0); tp.PaddingBottom = UDim.new(0.16, 0)
 	tp.Parent = timer
 	local tms = Instance.new("UIStroke"); tms.Thickness = 3; tms.Color = Color3.new(0, 0, 0); tms.Parent = timer
 	timer.Parent = track
