@@ -76,14 +76,44 @@ complaints about UI scaling on an ultrawide monitor.
   `DataService.push` (`PassService.has` is cached per user, so this is a table lookup,
   not a web call per push).
 
+- **The edge pinning never ran, and clipped the HUD off the top.** The first attempt
+  guarded on `pos.X.Scale == 0`, but the Figma export leaves floating-point noise in
+  the scale terms (IndexButton sits at `{-0.000154, 1748}`), so the test was false for
+  every child and the pass silently did nothing — the HUD still looked compressed on
+  an ultrawide. Fold the scale term into the offset instead of comparing to zero, and
+  resolve each child's top-left through its AnchorPoint. The fill container was also
+  centred, which put its top 58px above the ScreenGui's usable area (that area starts
+  below the Roblox topbar) and cut the Home button off; it now pins its top-left.
+- **The VFX were dead assets.** `ServerStorage.Assets.Vfx` held merge / cash /
+  confetti effects that nothing referenced. Added `VfxService` and hooked the three
+  moments they were made for. They play on the *server* so a merge on your farm is
+  visible to visitors, and the cash burst is gated on a world position because Auto
+  Collect fires the same path every tick with no position.
+
 ### Verified
 
-Playtested in Studio: clean boot with no errors, HUD spans the full ultrawide
-viewport (chips left, Total Toilets bottom-right, basket bottom-centre, Flush Meter
-top-centre), Index close button renders whole, and offline earnings works
-("17,588 Poops … away for 20m 52s"). Poop decorations confirmed by inspecting the
-dropped instances. **Not** verified: rejoin-twice data safety, and the once-per-step
-pad fix was reasoned + built but not exercised by walking a character over a pad.
+Playtested in Studio throughout, with measurements rather than eyeballing:
+
+- **Ultrawide layout**, measured on a 3100x1153 viewport: Index/Rebirth rightGap 1px,
+  CashBar leftGap 0, TotalToilets bottom-right 6/28, Home + basket + Flush Meter
+  centred to within 3px, nothing off-screen.
+- **Once per step-on**: stand on the Buy pad 8s → 1 purchase; keep standing 5s → 0;
+  step off and back on → 1. Three deliberate step-ons → exactly 3 toilets.
+- **Poop models**: dropped T1/T4/T5/T6 and inspected them — decoration counts
+  0 / 1 (pan mesh) / 4 (dumpster panels) / 2 (brick).
+- **Full core loop**: deposit in the sell zone → queue drained 6.57K → 5.15K →
+  collect pad showed $1,224 → collected. Rebirth reset cash to $10 and toilets to 0.
+- **All three VFX** confirmed spawning: merge, cash, confetti.
+- **Rejoin twice**: rebirth + cash + toilets + tokens all persisted across two
+  restarts. No data loss.
+- Offline earnings works ("17,588 Poops … away for 20m 52s").
+- No console errors in any run.
+
+**Not verified:** `selene` and `stylua` are not installed on this machine (only
+`rojo` is, via aftman — `rokit` itself is absent), so the 31-warning lint baseline
+was not checked and formatting was not run. `rojo build` does not typecheck, so the
+evidence that the new code is sound is that every changed path was exercised in a
+playtest without errors, not a static check.
 
 ### Not done / carried forward
 
@@ -97,10 +127,22 @@ pad fix was reasoned + built but not exercised by walking a character over a pad
 - An earlier attempt at the clipping fix disabled `ClipsDescendants` on *every*
   interactive element's parent and broke the game; it was reverted (`git reset --hard`)
   and force-pushed. The working fix is scoped to the top-level container only.
-- Still open from the partner's list: VFX import not wired up; poop-value/deposit
-  maths ("300+ poops deposited as 25"); pillars missing on the 2nd toilet variant;
-  Robux price display was reported as "1 instead of 12" (now shows 72 — needs a
-  second look); poop collision against the new boarders.
+- **Pillars on the "2nd variant" — not done, and not guessed at.** The report is
+  "It doesnt put the 2nd variant with the pillars". Investigated: all 48 stalls are
+  structurally identical (5 Parts + ToiletSpot) across 4 rows of 12, `setStallVisible`
+  treats every BasePart in a stall the same way, `buildToilet` clones whole models
+  with nothing dropped, and no instance anywhere on a plot is named pillar/support/
+  column/leg. This is a map-art question, not a code one, and it needs the partner to
+  say what "2nd variant" refers to. Left alone deliberately rather than editing map
+  geometry on a guess.
+- Two of the partner's items turned out to need no code change, and are **closed**:
+  poop-vs-boarders collision is already correct (`PoopWall` collides with `Poop` but
+  not with `Characters` or `Default`), and the "1 robux instead of 12" was the Flush
+  Token counter sitting under the x2 Cash badge behind a coin glyph — the price table
+  had 12 all along. The counter now names its unit.
+- `selene` / `stylua` / `luau-lsp` / `lune` are pinned in `rokit.toml` but rokit is
+  not installed on this machine; there is a stray untracked `aftman.toml` carrying
+  only rojo. Worth reconciling so the lint baseline can actually be checked.
 
 ---
 
