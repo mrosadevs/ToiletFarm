@@ -283,8 +283,13 @@ handlers.FinishNowPad = function(player)
 end
 
 handlers.GroupJoinPad = function(player)
+	-- Fire client event to prompt group join
 	local groupId = 16284220
-	player:PromptGroupRankChange(groupId)
+	Net.event(Net.NAMES.Toast):FireClient(player, "Opening group page...", "info")
+	task.wait(0.5)
+	-- Use game:GetService("GuiService") to open group (needs client execution)
+	-- For now, toast tells them to join manually
+	Net.event(Net.NAMES.Toast):FireClient(player, "Join our group: roblox.com/groups/" .. groupId, "info")
 end
 
 local function promptPass(passName: string)
