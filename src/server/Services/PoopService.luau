@@ -22,57 +22,124 @@ local PickupEvent = Net.event(Net.NAMES.PoopPickup)
 
 local PoopService = {}
 
--- cached one-part stand-ins, so we're not cloning 20-part models hundreds of times
+-- cached stand-ins, so we're not rebuilding a model hundreds of times
 local templateCache: { [string]: BasePart } = {}
+
+-- how big a poop reads on the belt; Micro is tiny and Mega is huge on purpose
+local function targetSize(tier: number): number
+	return (tier == 21 and 0.9) or (tier == 22 and 2.7) or 1.7
+end
+
+-- Every *_Poop model sets PrimaryPart to the SAME generic poop mesh
+-- (rbxassetid://118664197075805) — what makes a Rusty Pan look like a rusty pan is
+-- the *sibling* parts next to it. Cloning the PrimaryPart alone therefore dropped a
+-- plain brown lump for all 30 tiers. So keep the whole model, welded into one rigid
+-- body: the root still behaves as a single physics object on the conveyor, and the
+-- decoration parts ride along non-collidable so heaps still stack without gaps.
+local function buildTemplate(tier: number): BasePart
+	local source = PoopModels:FindFirstChild(Config.assetId(tier) .. "_Poop")
+	if not source or not source:IsA("Model") then
+		local p = Instance.new("Part")
+		p.Shape = Enum.PartType.Ball
+		p.Size = Vector3.new(1.5, 1.5, 1.5)
+		p.Color = Color3.fromRGB(105, 70, 40)
+		return p
+	end
+
+	local model = source:Clone()
+	-- Highlights and GUIs ride along on a clone and paint over the mutation FX we
+	-- add afterwards, so strip them here rather than per-drop.
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("Highlight") or d:IsA("BillboardGui") or d:IsA("SurfaceGui")
+			or d:IsA("Script") or d:IsA("LocalScript") or d:IsA("ProximityPrompt") then
+			d:Destroy()
+		end
+	end
+
+	local root = model.PrimaryPart
+	if not root then
+		local bestVol = 0
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") then
+				local v = d.Size.X * d.Size.Y * d.Size.Z
+				if v > bestVol then bestVol, root = v, d end
+			end
+		end
+	end
+	if not root then
+		model:Destroy()
+		local p = Instance.new("Part")
+		p.Shape = Enum.PartType.Ball
+		p.Size = Vector3.new(1.5, 1.5, 1.5)
+		p.Color = Color3.fromRGB(105, 70, 40)
+		return p
+	end
+
+	-- scale the whole assembly, not just the root, or the decorations detach
+	local extents = model:GetExtentsSize()
+	local dim = math.max(extents.X, extents.Y, extents.Z)
+	local k = dim > 0 and (targetSize(tier) / dim) or 1
+
+	-- record placements relative to the root before anything moves
+	local placed: { { part: BasePart, rel: CFrame, size: Vector3 } } = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			table.insert(placed, { part = d, rel = root.CFrame:ToObjectSpace(d.CFrame), size = d.Size })
+		end
+	end
+	root.CFrame = CFrame.new()
+	for _, e in ipairs(placed) do
+		e.part.Size = e.size * k
+		if e.part ~= root then
+			-- keep the rotation, scale only the offset from the root
+			e.part.CFrame = CFrame.new(e.rel.Position * k) * (e.rel - e.rel.Position)
+		end
+	end
+
+	for _, e in ipairs(placed) do
+		local part = e.part
+		local isRoot = part == root
+		-- Physics body, not a scripted mover. The belts are anchored parts with a
+		-- Velocity, so a free body resting on one is carried along for free.
+		part.Anchored = false
+		part.CanQuery = false
+		-- only the root collides and is touchable; decorations are cosmetic, so an
+		-- irregular silhouette can never wedge a poop on the belt
+		part.CanCollide = isRoot
+		part.CanTouch = isRoot
+		part.Massless = not isRoot
+		-- Collide as a BOX, never as the mesh. Irregular mesh collision is what
+		-- leaves visible gaps between poops in a heap.
+		if part:IsA("MeshPart") then
+			pcall(function() part.CollisionFidelity = Enum.CollisionFidelity.Box end)
+		end
+		-- density 1, LOW friction so they flow into a pile instead of sticking where
+		-- they land, zero elasticity so they do not bounce around
+		part.CustomPhysicalProperties = PhysicalProperties.new(1, 0.2, 0)
+		part.CollisionGroup = "Poop"
+	end
+
+	for _, e in ipairs(placed) do
+		if e.part ~= root then
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = root
+			weld.Part1 = e.part
+			weld.Parent = root
+			e.part.Parent = root
+		end
+	end
+
+	root.Parent = nil
+	model:Destroy()
+	return root
+end
 
 local function templateFor(tier: number, mut: string): BasePart
 	local cacheKey = tier .. "|" .. mut
 	local cached = templateCache[cacheKey]
 	if cached then return cached end
 
-	local sourceName = Config.assetId(tier) .. "_Poop"
-	local source = PoopModels:FindFirstChild(sourceName)
-	local part: BasePart?
-	if source then
-		-- Every *_Poop model has its PrimaryPart set to the poop body, so trust that
-		-- first. Falling back to "biggest by volume" alone picked decorations on some
-		-- tiers — a flat 1.70 x 0.38 x 0.74 slab instead of the poop.
-		local best = source.PrimaryPart
-		if not best then
-			local bestVol = 0
-			for _, d in ipairs(source:GetDescendants()) do
-				if d:IsA("MeshPart") then
-					local v = d.Size.X * d.Size.Y * d.Size.Z
-					if v > bestVol then bestVol, best = v, d end
-				end
-			end
-		end
-		if not best then
-			local bestVol = 0
-			for _, d in ipairs(source:GetDescendants()) do
-				if d:IsA("BasePart") then
-					local v = d.Size.X * d.Size.Y * d.Size.Z
-					if v > bestVol then bestVol, best = v, d end
-				end
-			end
-		end
-		if best then part = best:Clone() end
-	end
-	if not part then
-		local p = Instance.new("Part")
-		p.Shape = Enum.PartType.Ball
-		p.Size = Vector3.new(1.5, 1.5, 1.5)
-		p.Color = Color3.fromRGB(105, 70, 40)
-		part = p
-	end
-	local final = part :: BasePart
-	-- the mutation Highlight lives inside the MeshPart, so it rides along on a clone
-	-- and paints over whatever colour we set. Strip it, then re-add the right one.
-	for _, d in ipairs(final:GetDescendants()) do
-		if d:IsA("Highlight") or d:IsA("BillboardGui") or d:IsA("Script") or d:IsA("LocalScript") then
-			d:Destroy()
-		end
-	end
+	local final = buildTemplate(tier)
 	if mut ~= "None" then
 		local mutSource = MutationPoops:FindFirstChild("MUT_" .. mut .. "_Poop")
 		if mutSource then
@@ -88,27 +155,6 @@ local function templateFor(tier: number, mut: string): BasePart
 		end
 	end
 
-	-- Physics body, not a scripted mover. The belts are anchored parts with a
-	-- Velocity, so a free body resting on one is carried along for free.
-	final.Anchored = false
-	final.CanCollide = true
-	final.CanQuery = false
-	final.CanTouch = true
-	final.Massless = false
-	-- Collide as a BOX, never as the mesh. Irregular mesh collision is what leaves
-	-- visible gaps between poops in a heap.
-	if final:IsA("MeshPart") then
-		local ok = pcall(function() final.CollisionFidelity = Enum.CollisionFidelity.Box end)
-		if not ok then warn("[PoopService] could not set CollisionFidelity") end
-	end
-	-- density 1, LOW friction so they flow into a pile instead of sticking where
-	-- they land, zero elasticity so they do not bounce around
-	final.CustomPhysicalProperties = PhysicalProperties.new(1, 0.2, 0)
-	final.CollisionGroup = "Poop"
-	-- keep the tier's silhouette (Micro is tiny, Mega is huge) but bound it
-	local dim = math.max(final.Size.X, final.Size.Y, final.Size.Z)
-	local target = (tier == 21 and 0.9) or (tier == 22 and 2.7) or 1.7
-	if dim > 0 then final.Size = final.Size * (target / dim) end
 	templateCache[cacheKey] = final
 	return final
 end
