@@ -367,9 +367,12 @@ local function initWelcomeBack()
 			MarketplaceService:PromptProductPurchase(player, id)
 		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
 
-		-- show the real buyer price on the button's tag
+		-- Show the real buyer price. The authored label is called RobuxAmount, not
+		-- Price, so this only ever looked at a name that does not exist and the mockup
+		-- number baked into the button (72) survived into the live game.
 		local tag = panel:FindFirstChild("DoubleTag", true) :: TextLabel?
-		local priceLabel = double:FindFirstChild("Price", true) :: TextLabel?
+		local priceLabel = double:FindFirstChild("RobuxAmount", true) :: TextLabel?
+			or double:FindFirstChild("Price", true) :: TextLabel?
 		local shown = Prices.product("DoubleOffline")
 		if priceLabel and shown then priceLabel.Text = tostring(shown) end
 		if tag then tag.Text = "x2 Poops!" end
