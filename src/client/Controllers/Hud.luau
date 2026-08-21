@@ -183,10 +183,16 @@ local function refresh(data: any, changed: any)
 	end
 	refreshPacks(data.cash)
 
+	-- Show what you are CARRYING against the cap, not the accumulated cash value.
+	-- The basket used to print p.poops (value) while the cap and the FULL! title are
+	-- both counted in p.poopItems, so a basket reading "1.72K" would bank as
+	-- "Deposited 60 Poops!" and look like the game had eaten the difference.
 	local poops = find("PoopsAmount") :: TextLabel?
 	if poops then
-		poops.Text = Format.short(data.poops)
-		if changed.poops then UIKit.pop(poops, 1.12) end
+		local items = data.poopItems or 0
+		local cap = data.carryCap or 25
+		poops.Text = ("%s/%s"):format(Format.short(items), Format.short(cap))
+		if changed.poopItems or changed.poops then UIKit.pop(poops, 1.12) end
 	end
 
 	-- basket header doubles as the carry gauge
@@ -212,8 +218,14 @@ local function refresh(data: any, changed: any)
 		total.Text = "Total Toilets: " .. Format.short(n)
 	end
 
+	-- Name the unit. This counter sits directly under the x2 Cash badge behind a coin
+	-- glyph, so a bare "1" read as that button's price -- hence the "says 1 robux
+	-- instead of 12" report. These are Flush Tokens (the perk currency), not Robux.
 	local robux = find("RobuxAmount") :: TextLabel?
-	if robux then robux.Text = tostring(data.tokens or 0) end
+	if robux then
+		local n = data.tokens or 0
+		robux.Text = ("%s Token%s"):format(Format.comma(n), n == 1 and "" or "s")
+	end
 
 	-- the small line by the cash bar: what you actually earn right now
 	local multText = find("CashMultiplierText") :: TextLabel?
@@ -243,6 +255,19 @@ function Hud.init()
 
 	collectPacks()
 	buildFlushMeter()
+
+	-- the token row is authored 71px wide and clipping, which fits "11" and nothing
+	-- else; let it grow now that the label names its unit
+	local tokenRow = C:FindFirstChild("RobuxRow")
+	if tokenRow and tokenRow:IsA("GuiObject") then
+		tokenRow.ClipsDescendants = false
+		tokenRow.AutomaticSize = Enum.AutomaticSize.X
+		local amount = tokenRow:FindFirstChild("RobuxAmount")
+		if amount and amount:IsA("TextLabel") then
+			amount.AutomaticSize = Enum.AutomaticSize.X
+			amount.Size = UDim2.fromOffset(0, amount.AbsoluteSize.Y)
+		end
+	end
 
 	-- side buttons
 	local index = C:FindFirstChild("IndexButton")

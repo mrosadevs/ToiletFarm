@@ -114,7 +114,9 @@ local function refreshPad(pad: Model, player: Player)
 		end
 
 	elseif kind == "DepositPad" then
-		if quantity then quantity.Text = ("Deposit %s Poops"):format(Format.short(p.poops)) end
+		-- items, matching the basket gauge and the "Deposited X Poops!" banner; this
+		-- used to quote p.poops (the cash value), so the three disagreed
+		if quantity then quantity.Text = ("Deposit %s Poops"):format(Format.short(p.poopItems)) end
 	elseif kind == "RebirthPad" then
 		local cost = Config.rebirthCost(p.rebirths)
 		if quantity then quantity.Text = cost and ("Rebirth %d"):format(p.rebirths + 1) or "MAX REBIRTH" end
