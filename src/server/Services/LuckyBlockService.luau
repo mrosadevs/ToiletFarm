@@ -96,8 +96,22 @@ function LuckyBlockService.spawnOnPlot(player: Player, blockId: string?)
 	model:SetAttribute("BlockId", blockId)
 	-- Same physics treatment as a poop, so the block rides the same belts: one rigid
 	-- body, a single collider, low friction, and no collision with players.
+	--
+	-- The collider must be the block's BODY. These models ship with no PrimaryPart,
+	-- and FindFirstChildWhichIsA returns whatever comes first in the hierarchy -- on
+	-- the Basic block that is a 0.2 x 1.9 x 0.2 sliver of trim. With the body left
+	-- CanCollide = false the whole block fell straight through the belt it was
+	-- supposed to ride and came to rest on the floor below it, which is the "stuck"
+	-- the pad was reported for. Take the largest part instead.
 	local primary = model.PrimaryPart
-		or model:FindFirstChildWhichIsA("BasePart", true)
+	if not primary then
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("BasePart") and (not primary or d.Size.Magnitude > primary.Size.Magnitude) then
+				primary = d
+			end
+		end
+	end
+	model.PrimaryPart = primary
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
 			d.Anchored = false
@@ -108,6 +122,8 @@ function LuckyBlockService.spawnOnPlot(player: Player, blockId: string?)
 				d.CanCollide = true
 			else
 				d.CanCollide = false
+				-- decorations ride along without adding mass, as on the poops
+				d.Massless = true
 				local weld = Instance.new("WeldConstraint")
 				weld.Part0 = d
 				weld.Part1 = primary
