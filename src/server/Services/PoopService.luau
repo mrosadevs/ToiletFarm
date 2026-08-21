@@ -577,25 +577,27 @@ local function flyIntoPlayer(part: BasePart, hrp: BasePart)
 	to.Position = Vector3.new(0, 0.6, 0)
 	to.Parent = hrp
 
-	-- a kick upward so it arcs into the body rather than skating along the floor
-	part.AssemblyLinearVelocity = Vector3.new(0, 16, 0)
+	-- a small kick upward so it lifts off the floor before it snaps in
+	part.AssemblyLinearVelocity = Vector3.new(0, 9, 0)
 	part.AssemblyAngularVelocity = Vector3.new(
-		(math.random() - 0.5) * 10, (math.random() - 0.5) * 10, (math.random() - 0.5) * 10)
+		(math.random() - 0.5) * 14, (math.random() - 0.5) * 14, (math.random() - 0.5) * 14)
 
 	local align = Instance.new("AlignPosition")
 	align.Attachment0 = from
 	align.Attachment1 = to
 	align.ApplyAtCenterOfMass = true
-	align.MaxForce = 120000     -- a poop weighs well under a stud-cube; this is ample
-	align.MaxVelocity = 150
-	align.Responsiveness = 22   -- fast, but with enough give to read as a swoop
+	align.MaxForce = 400000     -- a poop weighs well under a stud-cube; this is ample
+	align.MaxVelocity = 600
+	align.Responsiveness = 85   -- snap, not a swoop: it should be gone in a blink
 	align.Parent = part
 
 	local owner = Players:GetPlayerFromCharacter(hrp.Parent)
 	if owner then pcall(function() part:SetNetworkOwner(owner) end) end
 
-	Debris:AddItem(to, 0.7)
-	Debris:AddItem(part, 0.7)
+	-- short: the flight is over in a fraction of this, and a poop that somehow never
+	-- reaches the player must not linger as a ghost
+	Debris:AddItem(to, 0.35)
+	Debris:AddItem(part, 0.35)
 end
 
 -- ── pickup ────────────────────────────────────────────────────────────────
