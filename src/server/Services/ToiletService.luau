@@ -266,6 +266,8 @@ function ToiletService.mergeAll(player: Player)
 		compactSlots(player)
 		DataService.push(player)
 		MergeResult:FireClient(player, highest, total)
+		-- server-side so anyone standing on the farm sees the merge, not just the owner
+		require(script.Parent.VfxService).playAt(player, "merge", Vector3.new(0, -1.5, 0))
 	else
 		toast(player, "Nothing to merge — you need 3 of a kind.", "error")
 	end

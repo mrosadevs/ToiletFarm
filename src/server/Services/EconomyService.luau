@@ -126,6 +126,11 @@ function EconomyService.collectCash(player: Player, worldPos: Vector3?)
 	p.cash += amount
 	CashEvent:FireClient(player, { amount = amount, pos = worldPos })
 	DataService.push(player, { cash = p.cash })
+	-- only for a real walk-on collection; Auto Collect fires this every tick with no
+	-- position and would otherwise spray particles continuously
+	if worldPos then
+		require(script.Parent.VfxService).play("cash", worldPos + Vector3.new(0, 2, 0))
+	end
 	return amount
 end
 
@@ -264,6 +269,8 @@ function EconomyService.rebirth(player: Player)
 	ToiletService.resetTimers(player)
 	DataService.push(player)
 	toast(player, ("REBIRTH %d! Now x%s income"):format(p.rebirths, entry.mult), "reward")
+	-- the one genuinely big moment in the loop; make it visible across the server
+	require(script.Parent.VfxService).playAt(player, "confetti", Vector3.new(0, 0, 0), 40)
 	return true
 end
 
