@@ -79,61 +79,80 @@ local function refreshPacks(cash: number)
 end
 
 -- ── Flush Meter readout ─────────────────────────────────────────────────
+-- The multiplier is SERVER-WIDE (see FlushMeterService), so it is banner furniture,
+-- not a personal stat: headline across the top middle of the screen with a countdown
+-- bar under it, where every player in the server is looking at the same number.
 local meterFrame: Frame
 local meterValue: TextLabel
 local meterTimer: TextLabel
-local meterState = { mult = 1, nextRollAt = 0 }
+local meterFill: Frame
+local meterState = { mult = 1, nextRollAt = 0, period = 30 }
 
 local function buildFlushMeter()
 	local f = Instance.new("Frame")
 	f.Name = "FlushMeter"
-	-- top-centre, directly under the Home button: it is the thing you sprint to bank
-	-- a good roll against, so it belongs where the eye already is, not in a corner
 	f.AnchorPoint = Vector2.new(0.5, 0)
-	f.Position = UDim2.new(0.5, 0, 0, 110)
-	f.Size = UDim2.fromOffset(300, 96)
-	f.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
-	f.BackgroundTransparency = 0.15
+	f.Position = UDim2.new(0.5, 0, 0, 104)
+	f.Size = UDim2.fromOffset(620, 104)
+	f.BackgroundTransparency = 1
 	f.BorderSizePixel = 0
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 14)
-	corner.Parent = f
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 3
-	stroke.Color = Color3.new(0, 0, 0)
-	stroke.Parent = f
 
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, 0, 0, 26)
-	title.Position = UDim2.fromOffset(0, 6)
-	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.FredokaOne
-	title.TextSize = 22
-	title.TextColor3 = Color3.fromRGB(230, 230, 235)
-	title.Text = "FLUSH METER"
-	local ts = Instance.new("UIStroke"); ts.Thickness = 2; ts.Color = Color3.new(0,0,0); ts.Parent = title
-	title.Parent = f
-
+	-- one bold line, no box behind it: the world reads through it like the reference
 	meterValue = Instance.new("TextLabel")
-	meterValue.Size = UDim2.new(1, 0, 0, 42)
-	meterValue.Position = UDim2.fromOffset(0, 28)
+	meterValue.Name = "MeterHeadline"
+	meterValue.Size = UDim2.new(1, 0, 0, 54)
 	meterValue.BackgroundTransparency = 1
 	meterValue.Font = Enum.Font.FredokaOne
-	meterValue.TextSize = 40
-	meterValue.Text = "x1"
-	local vs = Instance.new("UIStroke"); vs.Thickness = 3; vs.Color = Color3.new(0,0,0); vs.Parent = meterValue
+	meterValue.TextScaled = true
+	meterValue.TextColor3 = Color3.fromRGB(255, 235, 140)
+	meterValue.Text = "Flush Multiplier: 1x"
+	local vs = Instance.new("UIStroke")
+	vs.Thickness = 4; vs.Color = Color3.new(0, 0, 0); vs.Parent = meterValue
 	meterValue.Parent = f
 
+	local track = Instance.new("Frame")
+	track.Name = "MeterTrack"
+	track.AnchorPoint = Vector2.new(0.5, 0)
+	track.Position = UDim2.new(0.5, 0, 0, 60)
+	track.Size = UDim2.fromOffset(470, 40)
+	track.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+	track.BorderSizePixel = 0
+	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(1, 0); tc.Parent = track
+	local tstroke = Instance.new("UIStroke")
+	tstroke.Thickness = 3; tstroke.Color = Color3.new(0, 0, 0); tstroke.Parent = track
+	track.Parent = f
+
+	meterFill = Instance.new("Frame")
+	meterFill.Name = "MeterFill"
+	meterFill.Size = UDim2.fromScale(0, 1)
+	meterFill.BackgroundColor3 = Color3.new(1, 1, 1)
+	meterFill.BorderSizePixel = 0
+	local fc = Instance.new("UICorner"); fc.CornerRadius = UDim.new(1, 0); fc.Parent = meterFill
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.0, Color3.fromRGB(235, 70, 60)),
+		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(245, 165, 50)),
+		ColorSequenceKeypoint.new(0.7, Color3.fromRGB(245, 225, 70)),
+		ColorSequenceKeypoint.new(1.0, Color3.fromRGB(85, 220, 90)),
+	})
+	grad.Parent = meterFill
+	meterFill.Parent = track
+
 	meterTimer = Instance.new("TextLabel")
-	meterTimer.Size = UDim2.new(1, 0, 0, 22)
-	meterTimer.Position = UDim2.fromOffset(0, 70)
+	meterTimer.Name = "MeterTimer"
+	meterTimer.Size = UDim2.fromScale(1, 1)
 	meterTimer.BackgroundTransparency = 1
 	meterTimer.Font = Enum.Font.FredokaOne
-	meterTimer.TextSize = 18
-	meterTimer.TextColor3 = Color3.fromRGB(200, 200, 210)
+	meterTimer.TextScaled = true
+	meterTimer.TextColor3 = Color3.new(1, 1, 1)
 	meterTimer.Text = ""
-	local ms = Instance.new("UIStroke"); ms.Thickness = 2; ms.Color = Color3.new(0,0,0); ms.Parent = meterTimer
-	meterTimer.Parent = f
+	meterTimer.ZIndex = 3
+	local tp = Instance.new("UIPadding")
+	tp.PaddingTop = UDim.new(0, 7); tp.PaddingBottom = UDim.new(0, 7)
+	tp.Parent = meterTimer
+	local ms = Instance.new("UIStroke")
+	ms.Thickness = 3; ms.Color = Color3.new(0, 0, 0); ms.Parent = meterTimer
+	meterTimer.Parent = track
 
 	f.Parent = C
 	meterFrame = f
@@ -274,7 +293,7 @@ function Hud.init()
 	-- Flush Meter feed
 	Net.event(Net.NAMES.FlushMeter).OnClientEvent:Connect(function(payload)
 		meterState = payload
-		meterValue.Text = ("x%s"):format(payload.mult)
+		meterValue.Text = ("Flush Multiplier: %sx"):format(payload.mult)
 		meterValue.TextColor3 = meterColor(payload.mult)
 		UIKit.pop(meterFrame, 1.12)
 	end)
@@ -284,15 +303,16 @@ function Hud.init()
 		while true do
 			task.wait(0.1)
 			if meterTimer and meterState.nextRollAt then
+				local period = meterState.period or Config.FLUSH_METER.period
 				local left = meterState.nextRollAt - workspace:GetServerTimeNow()
-				if left <= Config.FLUSH_METER.warn and left > 0 then
-					meterTimer.Text = ("re-rolls in %.1fs"):format(left)
-					meterTimer.TextColor3 = Color3.fromRGB(255, 190, 90)
-				elseif left > 0 then
-					meterTimer.Text = ("%ds"):format(math.ceil(left))
-					meterTimer.TextColor3 = Color3.fromRGB(190, 190, 200)
+				if left > 0 then
+					meterTimer.Text = ("Updating in %ds"):format(math.ceil(left))
+					-- the bar fills toward the re-roll rather than draining, so a full
+					-- bar reads as "about to change" at a glance
+					meterFill.Size = UDim2.fromScale(math.clamp((period - left) / period, 0, 1), 1)
 				else
-					meterTimer.Text = ""
+					meterTimer.Text = "Updating..."
+					meterFill.Size = UDim2.fromScale(1, 1)
 				end
 			end
 		end

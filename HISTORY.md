@@ -45,8 +45,22 @@ complaints about UI scaling on an ultrawide monitor.
   their nearest edge (or centre), and the HUD container is widened to `viewport/scale`
   in design space so one uniform scale still renders as exactly the viewport.
   Panels deliberately keep the centred design frame.
-- **Flush Meter moved to top-centre** under the Home button (partner request), from
-  its old top-right corner at offset x=1892 (which was outside the 1876 design width).
+- **Flush Meter rebuilt as a top-centre banner** (partner request, with a reference
+  screenshot of the "Egg Multiplier" bar from the game they are benchmarking against).
+  It was a dark 300x96 box in the top-right at offset x=1892 — outside the 1876-wide
+  design frame. It is now a headline (`Flush Multiplier: 1.5x`, coloured by roll
+  quality) over a gradient countdown pill reading `Updating in Ns`, dead centre at the
+  top. The multiplier is server-wide (`FlushMeterService` broadcasts to all clients),
+  so it is banner furniture rather than a personal stat, which is the whole point of
+  putting it where everyone sees the same number. The `period` field was already in
+  the broadcast payload and now drives the bar fill.
+- **Spawn point anchored to the Merge pad** (`PlotService.teleportToPlot`). It used
+  the plot's *bounding-box centre*, which drifts with the stall geometry, so players
+  arrived in arbitrary spots. Now it steps off the Merge pad toward the middle of the
+  island by the pad's half-width plus 5 studs and faces it. Measured on a real
+  respawn: 8.5 studs from a 7.1-wide pad, facing dot = 1.00. Standing *on* the pad is
+  still avoided (that was the original reason for using the centre) — and the new
+  contact-gating means a clipped toe could not spam it anyway.
 - **Invisible parts were casting shadows** — 1,889 of them across the six plots. That
   is the "invisible conveyor belt on the grass": geometry you cannot see throwing
   hard-edged shadows onto the lawn. `CastShadow = false` on every part with
