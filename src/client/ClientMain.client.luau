@@ -80,6 +80,24 @@ Net.event(N.MergeResult).OnClientEvent:Connect(function(tier, count)
 	Popups.toast(("Merged %d time%s!"):format(count, count == 1 and "" or "s"), "reward")
 end)
 
+-- The group join prompt is a client-only API, so the pad asks us to raise it.
+-- PromptJoinAsync takes the group id alone (it is implicitly the local player) and
+-- YIELDS for as long as the dialog is open, so it gets its own thread rather than
+-- stalling the remote handler.
+Net.event(N.PromptGroupJoin).OnClientEvent:Connect(function(groupId)
+	if type(groupId) ~= "number" or groupId <= 0 then return end
+	task.spawn(function()
+		local GroupService = game:GetService("GroupService")
+		local ok, err = pcall(function()
+			GroupService:PromptJoinAsync(groupId)
+		end)
+		if not ok then
+			warn("[ClientMain] group join prompt failed: " .. tostring(err))
+			Popups.toast("Could not open the group page.", "error")
+		end
+	end)
+end)
+
 Net.event(N.Toast).OnClientEvent:Connect(function(text, kind)
 	-- the server uses this channel to ask the client to open a panel too
 	if text == "__OPEN_REBIRTH" then

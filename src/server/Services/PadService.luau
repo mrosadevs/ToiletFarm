@@ -22,6 +22,12 @@ local TutorialService = require(script.Parent.TutorialService)
 
 local PadService = {}
 
+-- Bound at module scope, not inside the handler: Net creates a remote on the server
+-- the first time it is asked for one, so a remote only referenced inside a touch
+-- handler does not exist until someone steps on the pad -- and the client, which
+-- connects at startup, times out waiting for it.
+local GroupJoinEvent = Net.event(Net.NAMES.PromptGroupJoin)
+
 -- A floor under deliberate re-steps only; the real once-per-step guard is the
 -- contact counting in bindPlate.
 local COOLDOWN = {
@@ -288,14 +294,22 @@ handlers.FinishNowPad = function(player)
 	MarketplaceService:PromptProductPurchase(player, id)
 end
 
+-- The group that owns this place. Read from game.CreatorId rather than pasted in,
+-- so it cannot drift if the game is ever moved to another group.
+local GROUP_ID = (game.CreatorType == Enum.CreatorType.Group) and game.CreatorId or 0
+
 handlers.GroupJoinPad = function(player)
-	-- Fire client event to prompt group join
-	local groupId = 16284220
-	Net.event(Net.NAMES.Toast):FireClient(player, "Opening group page...", "info")
-	task.wait(0.5)
-	-- Use game:GetService("GuiService") to open group (needs client execution)
-	-- For now, toast tells them to join manually
-	Net.event(Net.NAMES.Toast):FireClient(player, "Join our group: roblox.com/groups/" .. groupId, "info")
+	if GROUP_ID == 0 then
+		Net.event(Net.NAMES.Toast):FireClient(player, "No group set up yet!", "error")
+		return
+	end
+	if player:IsInGroup(GROUP_ID) then
+		Net.event(Net.NAMES.Toast):FireClient(player, "You're already in the group. Thanks!", "info")
+		return
+	end
+	-- GroupService:PromptJoinAsync only exists on the client, so ask the client to
+	-- raise it rather than trying to prompt from here.
+	GroupJoinEvent:FireClient(player, GROUP_ID)
 end
 
 local function promptPass(passName: string)

@@ -54,6 +54,7 @@ Net.NAMES = {
 	OfflineReport  = "OfflineReport",  -- {poops, seconds}
 	Toast          = "Toast",          -- {text, kind}
 	MergeResult    = "MergeResult",    -- {tier, count}
+	PromptGroupJoin = "PromptGroupJoin", -- {groupId} -- the join prompt is client-only
 
 	-- client -> server
 	BuyToilet      = "BuyToilet",
