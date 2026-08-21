@@ -374,21 +374,39 @@ function PlotService.teleportToPlot(player: Player)
 	if not char then return end
 	local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not hrp then return end
-	-- Land in the MIDDLE of the island, not on a pad: spawning on the merge pad
-	-- fired it the instant you arrived.
+
 	local cf, size = plot:GetBoundingBox()
 	local centre = cf.Position
 
-	-- drop onto whatever ground is under the centre
+	-- Land just off the Merge pad, facing it. This used to use the plot's bounding-box
+	-- centre, but that centre drifts with the stall geometry, so players arrived in
+	-- arbitrary spots. Standing ON the pad is still wrong (it would fire on arrival),
+	-- so step back toward the open middle of the island by the pad's own half-width
+	-- plus a margin.
+	local base = plot:FindFirstChild("Base")
+	local merge = base and base:FindFirstChild("MergePad")
+	local plate = merge and (merge:FindFirstChild("Plate") or (merge :: Model).PrimaryPart) :: BasePart?
+
+	local anchor, facing = centre, centre + plot:GetPivot().LookVector * -1
+	if plate then
+		-- horizontal direction from the pad toward the middle of the island
+		local away = centre - plate.Position
+		away = Vector3.new(away.X, 0, away.Z)
+		away = away.Magnitude > 0.1 and away.Unit or (plot:GetPivot().LookVector * -1)
+		local clearance = math.max(plate.Size.X, plate.Size.Z) * 0.5 + 5
+		anchor = plate.Position + away * clearance
+		facing = plate.Position
+	end
+
+	-- drop onto whatever ground is under it
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { char, plot:FindFirstChild("WorldPoops") }
-	local from = Vector3.new(centre.X, centre.Y + size.Y * 0.5 + 10, centre.Z)
+	local from = Vector3.new(anchor.X, centre.Y + size.Y * 0.5 + 10, anchor.Z)
 	local hit = workspace:Raycast(from, Vector3.new(0, size.Y + 60, 0) * -1, params)
 
-	local target = hit and (hit.Position + Vector3.new(0, 4, 0)) or centre
-	-- face the stalls, which sit toward the plot's +Z
-	hrp.CFrame = CFrame.lookAt(target, target + plot:GetPivot().LookVector * -1)
+	local target = hit and (hit.Position + Vector3.new(0, 4, 0)) or anchor
+	hrp.CFrame = CFrame.lookAt(target, Vector3.new(facing.X, target.Y, facing.Z))
 end
 
 function PlotService.init()
