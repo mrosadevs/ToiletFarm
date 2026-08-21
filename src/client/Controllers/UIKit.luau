@@ -15,8 +15,14 @@ local UIKit = {}
 local DESIGN = Vector2.new(1920, 1080)
 
 function UIKit.bindScale(screen: ScreenGui)
-	local container = screen:FindFirstChild("Container")
+	local container = screen:FindFirstChild("Container") :: GuiObject?
 	if not container then return end
+
+	-- Make container fill the screen for ultrawide support
+	container.Size = UDim2.fromScale(1, 1)
+	container.Position = UDim2.new(0.5, 0, 0.5, 0)
+	container.AnchorPoint = Vector2.new(0.5, 0.5)
+
 	local scale = container:FindFirstChild("FigBloxUIViewportScale") :: UIScale?
 	if not scale then
 		scale = Instance.new("UIScale")

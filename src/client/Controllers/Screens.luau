@@ -33,7 +33,8 @@ function Screens.register(name: string, onOpen: (() -> ())?)
 	local close = screen:FindFirstChild("CloseButton", true)
 	if close and close:IsA("GuiObject") then
 		UIKit.makeInteractive(close, function() Screens.close(name) end, {
-			hover = 1.12,
+			hover = 1.0,
+			press = 0.95,
 			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
 		})
 	end

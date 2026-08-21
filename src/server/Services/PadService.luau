@@ -23,7 +23,7 @@ local TutorialService = require(script.Parent.TutorialService)
 local PadService = {}
 
 local COOLDOWN = {
-	BuyButton = 0.18, MergePad = 0.5, DepositPad = 0.35, CollectCashPad = 0.25,
+	BuyButton = 0.5, MergePad = 0.5, DepositPad = 0.35, CollectCashPad = 0.25,
 	RebirthPad = 1.0, FreeMoneyPad = 1.0, ProcessingPad = 0.4,
 }
 local DEFAULT_COOLDOWN = 0.6
