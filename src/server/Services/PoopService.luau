@@ -84,16 +84,16 @@ local function buildTemplate(tier: number): BasePart
 	local placed: { { part: BasePart, rel: CFrame, size: Vector3 } } = {}
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
-			table.insert(placed, { part = d, rel = root.CFrame:ToObjectSpace(d.CFrame), size = d.Size })
+			-- keep the rotation, scale only the offset from the root
+			local rel = root.CFrame:ToObjectSpace(d.CFrame)
+			local scaled = CFrame.new(rel.Position * k) * (rel - rel.Position)
+			table.insert(placed, { part = d, rel = scaled, size = d.Size })
 		end
 	end
 	root.CFrame = CFrame.new()
 	for _, e in ipairs(placed) do
 		e.part.Size = e.size * k
-		if e.part ~= root then
-			-- keep the rotation, scale only the offset from the root
-			e.part.CFrame = CFrame.new(e.rel.Position * k) * (e.rel - e.rel.Position)
-		end
+		if e.part ~= root then e.part.CFrame = e.rel end
 	end
 
 	for _, e in ipairs(placed) do
@@ -121,9 +121,15 @@ local function buildTemplate(tier: number): BasePart
 
 	for _, e in ipairs(placed) do
 		if e.part ~= root then
-			local weld = Instance.new("WeldConstraint")
+			-- A WeldConstraint does NOT drag its Part1 when Part0.CFrame is assigned
+			-- directly, and drop() places every poop by assigning root.CFrame. That
+			-- left each decoration stranded ~65 studs away, so all 30 tiers rendered
+			-- as the bare stock poop no matter which model they came from. A Weld
+			-- derives Part1 rigidly from Part0 * C0, so the assembly moves as one.
+			local weld = Instance.new("Weld")
 			weld.Part0 = root
 			weld.Part1 = e.part
+			weld.C0 = e.rel
 			weld.Parent = root
 			e.part.Parent = root
 		end
