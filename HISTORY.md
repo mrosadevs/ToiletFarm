@@ -12,6 +12,107 @@ this file is that the unfinished work stays visible across sessions.
 
 ---
 
+## Session 3 - 2026-08-21 - Pad affordability, poop accounting, group reward pad
+
+Live bug list from the partner and from the owner's own playtest, worked through in
+one pass. **Nothing in this entry was playtested**: the Rojo plugin is disconnected
+in Studio, so none of these files ever reached the running game. See "Not verified".
+
+### Done
+
+- **Pads said "no" without saying why** (`PadService.refreshPad`). Unaffordable and
+  maxed-out shared one grey, so a pad you had outgrown and one you were two dollars
+  short of looked identical. Split into `PLATE.ready` (brown), `PLATE.denied` (red,
+  cannot pay) and `PLATE.inactive` (grey, nothing to do). Rebirth and Processing keep
+  grey only at MAX; Upgrade Buy Tier keeps it only while the next tier is locked
+  behind a rebirth, and now turns red when the toilets are there but the cash is not
+  -- that case used to render as affordable. The in-panel Rebirth button follows the
+  same three colours. `d312c9c`
+- **Merge pad is grey with nothing to merge**, via new `ToiletService.pendingMerges`,
+  which mirrors `mergeOnce`'s eligibility (anything below MAX_TIER, mutated or not)
+  and counts cascades. `d312c9c`
+- **Offline claim credited value but not items** (`EconomyService.claimOffline`).
+  `profile.poops` is a VALUE and `profile.poopItems` is a COUNT; the basket shows the
+  count, so claiming added nothing visible and read as a no-op. The profile now
+  persists `itemRateAtLogout` beside `rateAtLogout`, `Config.offlineItems` converts it
+  over the same window, and Claim credits both. Profiles saved before the field
+  existed divide the value by today's average poop value instead of paying zero
+  items. The modal and its x2 tag now quote the count. `7357c13`
+- **Pickup popups printed the poop's cash value** -- one poop worth 19 flashed "+19"
+  while the basket went up by one. It is +1 per poop now; value still decides the big
+  gold treatment. `7357c13`
+- **x2 Offline Poops button showed 72 Robux.** The lookup asked for a label named
+  `Price`; the authored label is `RobuxAmount`, so nothing was found and the Figma
+  mockup number shipped as the price. `aed9cf5`
+- **Magnetise animation was a slideshow** (`PoopService.flyIntoPlayer`). It wrote
+  `part.CFrame` every frame on an *anchored* part -- that replicates at ~20Hz and the
+  receiving client does not interpolate it -- and rewrote `Size` every frame too. Now
+  an `AlignPosition` between the poop and an attachment on the player's root, with
+  network ownership handed to the collector so the flight simulates on their machine.
+  `595ece0`
+- **Border barriers did nothing on any farm.** The invisible slabs under
+  `Plot*.Border` (renamed `PoopBarrier`/`PopBarrier` on Plot3 by the owner) were plain
+  `Default` parts with `CanCollide` off. They now join the `PoopWall` group, which was
+  already registered to collide with `Poop` and nothing else. Collision is only
+  enabled if the group assignment succeeded -- a barrier left in `Default` with
+  collision on would wall the player in. `595ece0`
+- **Lucky blocks spawned inside the toilet** and wedged under the model. They now
+  enter at the poop drop point (`PoopService.dropPoint`, newly exposed) plus 1.5
+  studs. `15d8014`
+- **Flush Multiplier hologram** 22 -> 38 studs wide. `6de5906`
+- **Group pad is now a members-only payout** (`2bbf33d`): 12% of balance, floor $500,
+  every 10 minutes, wall-clock in the profile so a server hop does not reset it.
+  Non-members get the join prompt and nothing else. `Player:IsInGroup` answers from
+  the join-time snapshot, so a `GetGroupsAsync` refresh runs on touch only, cached
+  20s; the 4Hz label refresh never makes a web call. The pad also gained a hologram
+  (cloned off the plot's CollectCashPad so it matches the farm).
+- **All six GroupJoinPad clones were sitting on one farm.** They were cloned in
+  session 2 and never moved, so five islands had no visible pad. They are re-seated at
+  runtime from whichever pad is already on its own island, so this holds regardless of
+  what the place file contains. `2bbf33d`
+
+### Verified
+
+- `rojo build` succeeds after every change.
+- `ToiletService.pendingMerges` logic run against 9 synthetic cases in Studio
+  (empty/2/3/8/9/27 of T1, mixed tiers, T30 maxed, T29): all correct, cascades
+  included -- 9 x T1 reports 4, not 3.
+- Every pad kind that gets painted really has a `Plate` child, including MergePad,
+  which had never been painted before.
+- Re-seat geometry dry-run in the live DataModel: all six pads land 31.5 studs from
+  their own base and 48.5 from their own MergePad, identical on every plot; Plot1 is
+  a no-op.
+- A billboard donor exists on all six plots.
+- Collision matrix already correct: `PoopWall` collides with `Poop` only.
+
+### Not verified / not done
+
+- **Nothing has run in game.** The Rojo plugin is disconnected in Studio: `rojo serve`
+  was not running at the start of the session (no listener on 34872), and after
+  restarting it the plugin did not reconnect on its own. Both datamodels still hold
+  the pre-session sources. Every behavioural claim above is reasoning plus static
+  checks, not a playtest.
+- The `2nd variant pillars` report from session 2 is still open and still unclarified.
+- The owner must still **save the place**: session 2's CastShadow fix (1,889 parts),
+  the GroupJoinPad clones and the `PadKind` attribute correction are Workspace edits
+  Rojo does not own. (The pad *positions* no longer depend on this.)
+- The group join dialog has still never been watched appearing for a non-member.
+- `selene` / `stylua` are still not installed, so the 31-warning lint baseline is
+  still unchecked. `aftman.toml` vs the pinned `rokit.toml` is still unreconciled.
+- `SepticCapacity` is still a dead upgrade now that the carry cap is gone.
+- Group reward numbers (12% / $500 / 10 min) are a first guess and have not been
+  balance-tested against the rest of the economy.
+
+### Next session
+
+1. Connect Rojo in Studio, then playtest the whole list above -- especially the
+   magnetise animation, the border barriers (walk through one, roll a poop into it)
+   and the group pad on a farm other than Plot1.
+2. Test the group pad with an account that is NOT in group 696602381.
+3. Decide the group reward numbers after seeing them in play.
+
+---
+
 ## Session 2 — 2026-08-20 · Playtest bug pass from partner feedback
 
 Driven by a list of bugs from the project partner (Discord screenshots) plus live
