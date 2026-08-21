@@ -293,12 +293,12 @@ local function hologramAnchor(): CFrame
 		end
 		if count > 0 then
 			local centre = sum / count
-			-- Sits just clear of the leaderboard tops. The board is 12.4 studs tall and
-			-- centred on this point, so +7 leaves its bottom edge about a stud above
-			-- them -- a banner ON the boards. It used to be +11 for a board barely half
-			-- this tall, which after the enlargement put it high enough that you had to
-			-- crane the camera up from the hub floor to read it.
-			return CFrame.new(centre.X, highest + 7, centre.Z)
+			-- Threaded between two things: the board is 11 studs tall and centred here,
+			-- so +6 puts its bottom edge half a stud ABOVE the leaderboard tops -- any
+			-- lower and whichever board is nearest the camera cuts across the bar --
+			-- while staying low enough that the HUD's own Home button does not clip
+			-- the title from the hub floor, which is where it is meant to be read.
+			return CFrame.new(centre.X, highest + 6, centre.Z)
 		end
 	end
 	local centre = workspace:FindFirstChild("Center")
@@ -333,78 +333,84 @@ function WorldFx.buildFlushHologram()
 	local board = Instance.new("BillboardGui")
 	board.Name = "FlushHologram"
 	-- Sized in STUDS, not pixels: an offset-sized billboard is enormous up close and
-	-- swallowed the middle of the screen. The leaderboards below it are ~13 studs
-	-- wide, so this sits at about their width.
-	board.Size = UDim2.fromScale(38, 12.4)
+	-- swallowed the middle of the screen. Wide and shallow, matching the proportions
+	-- of the reference game's Egg Multiplier -- a title line over a long thin scale.
+	board.Size = UDim2.fromScale(46, 11)
 	board.StudsOffsetWorldSpace = Vector3.new(0, 0, 0)
-	-- it should never punch through the world from another island
-	board.MaxDistance = 400
+	-- Range cut to the hub: the reference game's multiplier is likewise absent from
+	-- its own farm screenshots and only appears once you are standing in the middle.
+	board.MaxDistance = 170
 	board.LightInfluence = 0
+	-- Must stay false. A BillboardGui sized in SCALE renders NOTHING at all with
+	-- AlwaysOnTop on -- that mode wants an Offset size -- so the whole widget simply
+	-- disappears. Occlusion by the leaderboards is handled by sitting above them.
 	board.AlwaysOnTop = false
 	board.Parent = anchor
 
+	-- Laid out after the reference game's Egg Multiplier: one title line carrying the
+	-- value, and under it a long thin scale coloured across the whole range of rolls
+	-- with a pointer marking where this one landed. No panel behind it -- the design
+	-- reads as light in the air, and a black stroke carries it against the sky.
 	local panel = Instance.new("Frame")
 	panel.Size = UDim2.fromScale(1, 1)
-	panel.BackgroundColor3 = Color3.fromRGB(20, 40, 70)
-	panel.BackgroundTransparency = 0.35
-	panel.BorderSizePixel = 0
-	local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0.14, 0); pc.Parent = panel
-	local ps = Instance.new("UIStroke")
-	ps.Thickness = 4
-	ps.Color = Color3.fromRGB(120, 230, 255)
-	ps.Transparency = 0.15
-	ps.Parent = panel
+	panel.BackgroundTransparency = 1
 	panel.Parent = board
 
 	-- everything below is laid out in SCALE so it follows the stud-sized billboard
 	local title = Instance.new("TextLabel")
-	title.Size = UDim2.fromScale(0.92, 0.21)
-	title.Position = UDim2.fromScale(0.04, 0.06)
+	title.Name = "Title"
+	-- Sits low in the billboard on purpose. The board has to hang high enough that
+	-- the bar clears the leaderboard tops, and at that height a title pinned to the
+	-- top edge lands behind the HUD's Home button. Dropping the content down the
+	-- board buys that clearance without shrinking the text.
+	title.Size = UDim2.fromScale(1, 0.44)
+	title.Position = UDim2.fromScale(0, 0.16)
 	title.BackgroundTransparency = 1
 	title.Font = Enum.Font.FredokaOne
 	title.TextScaled = true
-	title.TextColor3 = Color3.fromRGB(170, 235, 255)
-	title.Text = "FLUSH MULTIPLIER"
-	local tls = Instance.new("UIStroke"); tls.Thickness = 3; tls.Color = Color3.new(0, 0, 0); tls.Parent = title
+	-- the peach the reference uses, not a cyan that fights the sky
+	title.TextColor3 = Color3.fromRGB(255, 205, 165)
+	title.Text = "Flush Multiplier: 1x"
+	local tls = Instance.new("UIStroke")
+	tls.Thickness = 4
+	tls.Color = Color3.new(0, 0, 0)
+	tls.Parent = title
 	title.Parent = panel
 
-	local value = Instance.new("TextLabel")
-	value.Name = "Value"
-	value.Size = UDim2.fromScale(0.92, 0.38)
-	value.Position = UDim2.fromScale(0.04, 0.25)
-	value.BackgroundTransparency = 1
-	value.Font = Enum.Font.FredokaOne
-	value.TextScaled = true
-	value.TextColor3 = Color3.fromRGB(255, 235, 140)
-	value.Text = "1x"
-	local vls = Instance.new("UIStroke"); vls.Thickness = 5; vls.Color = Color3.new(0, 0, 0); vls.Parent = value
-	value.Parent = panel
-
 	local track = Instance.new("Frame")
+	track.Name = "Track"
 	track.AnchorPoint = Vector2.new(0.5, 0)
-	track.Position = UDim2.fromScale(0.5, 0.68)
-	track.Size = UDim2.fromScale(0.86, 0.22)
-	track.BackgroundColor3 = Color3.fromRGB(16, 24, 38)
+	track.Position = UDim2.fromScale(0.5, 0.64)
+	track.Size = UDim2.fromScale(0.9, 0.28)
+	track.BackgroundColor3 = Color3.new(1, 1, 1)
 	track.BorderSizePixel = 0
 	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(1, 0); tc.Parent = track
 	local ts = Instance.new("UIStroke"); ts.Thickness = 3; ts.Color = Color3.new(0, 0, 0); ts.Parent = track
-	track.Parent = panel
-
-	local fill = Instance.new("Frame")
-	fill.Name = "Fill"
-	fill.Size = UDim2.fromScale(0, 1)
-	fill.BackgroundColor3 = Color3.new(1, 1, 1)
-	fill.BorderSizePixel = 0
-	local fc = Instance.new("UICorner"); fc.CornerRadius = UDim.new(1, 0); fc.Parent = fill
+	-- The gradient is the SCALE, not a fill: it spans every multiplier the table can
+	-- roll, worst on the left to best on the right, so the pointer's position alone
+	-- says whether this roll was good.
 	local grad = Instance.new("UIGradient")
 	grad.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0.0, Color3.fromRGB(235, 70, 60)),
+		ColorSequenceKeypoint.new(0.0, Color3.fromRGB(235, 90, 80)),
 		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(245, 165, 50)),
 		ColorSequenceKeypoint.new(0.7, Color3.fromRGB(245, 225, 70)),
 		ColorSequenceKeypoint.new(1.0, Color3.fromRGB(85, 220, 90)),
 	})
-	grad.Parent = fill
-	fill.Parent = track
+	grad.Parent = track
+	track.Parent = panel
+
+	-- the part of the scale beyond where this roll landed, dimmed back
+	local shade = Instance.new("Frame")
+	shade.Name = "Shade"
+	shade.AnchorPoint = Vector2.new(1, 0)
+	shade.Position = UDim2.fromScale(1, 0)
+	shade.Size = UDim2.fromScale(0.5, 1)
+	shade.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	shade.BackgroundTransparency = 0.55
+	shade.BorderSizePixel = 0
+	shade.ZIndex = 2
+	local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(1, 0); sc.Parent = shade
+	shade.Parent = track
 
 	local timer = Instance.new("TextLabel")
 	timer.Name = "Timer"
@@ -414,19 +420,54 @@ function WorldFx.buildFlushHologram()
 	timer.TextScaled = true
 	timer.TextColor3 = Color3.new(1, 1, 1)
 	timer.Text = ""
-	timer.ZIndex = 3
+	timer.ZIndex = 4
 	local tp = Instance.new("UIPadding")
-	tp.PaddingTop = UDim.new(0.16, 0); tp.PaddingBottom = UDim.new(0.16, 0)
+	tp.PaddingTop = UDim.new(0.14, 0); tp.PaddingBottom = UDim.new(0.14, 0)
 	tp.Parent = timer
 	local tms = Instance.new("UIStroke"); tms.Thickness = 3; tms.Color = Color3.new(0, 0, 0); tms.Parent = timer
 	timer.Parent = track
 
+	-- the marker under the bar, pointing up at where this roll landed
+	local pointer = Instance.new("TextLabel")
+	pointer.Name = "Pointer"
+	pointer.AnchorPoint = Vector2.new(0.5, 0)
+	pointer.Size = UDim2.fromScale(0.07, 0.15)
+	pointer.Position = UDim2.fromScale(0.5, 0.92)
+	pointer.BackgroundTransparency = 1
+	pointer.Font = Enum.Font.FredokaOne
+	pointer.TextScaled = true
+	pointer.TextColor3 = Color3.new(0, 0, 0)
+	pointer.Text = "\u{25B2}"
+	pointer.ZIndex = 5
+	pointer.Parent = panel
+
+	-- where a given multiplier sits along the scale, 0 at the worst roll the table
+	-- can produce and 1 at the best
+	local lowest, highest = math.huge, -math.huge
+	for _, e in ipairs(Config.FLUSH_METER.table) do
+		lowest = math.min(lowest, e.mult)
+		highest = math.max(highest, e.mult)
+	end
+	local function positionOf(mult: number): number
+		if highest <= lowest then return 0.5 end
+		return math.clamp((mult - lowest) / (highest - lowest), 0, 1)
+	end
+
+	local function show(mult: number)
+		title.Text = ("Flush Multiplier: %sx"):format(mult)
+		title.TextColor3 = meterColour(mult)
+		local at = positionOf(mult)
+		-- the pointer rides the track, so its span has to match the track's, not the
+		-- whole board's: the track is 0.9 wide and centred.
+		pointer.Position = UDim2.fromScale(0.05 + at * 0.9, 0.92)
+		shade.Size = UDim2.fromScale(1 - at, 1)
+	end
+	show(1)
+
 	local state = { mult = 1, nextRollAt = 0, period = Config.FLUSH_METER.period }
 	Net.event(Net.NAMES.FlushMeter).OnClientEvent:Connect(function(payload)
 		state = payload
-		value.Text = ("%sx"):format(payload.mult)
-		value.TextColor3 = meterColour(payload.mult)
-		ps.Color = meterColour(payload.mult)
+		show(payload.mult)
 	end)
 
 	-- gentle bob, so it reads as a hologram rather than a decal in the sky
@@ -434,15 +475,8 @@ function WorldFx.buildFlushHologram()
 	task.spawn(function()
 		while anchor.Parent do
 			task.wait(0.1)
-			local period = state.period or Config.FLUSH_METER.period
 			local left = state.nextRollAt - workspace:GetServerTimeNow()
-			if left > 0 then
-				timer.Text = ("Updating in %ds"):format(math.ceil(left))
-				fill.Size = UDim2.fromScale(math.clamp((period - left) / period, 0, 1), 1)
-			else
-				timer.Text = "Updating..."
-				fill.Size = UDim2.fromScale(1, 1)
-			end
+			timer.Text = left > 0 and ("Updating in %ds"):format(math.ceil(left)) or "Updating..."
 			anchor.CFrame = CFrame.new(
 				anchor.Position.X,
 				baseY + math.sin(workspace:GetServerTimeNow() * 1.1) * 0.7,
