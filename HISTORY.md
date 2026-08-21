@@ -94,6 +94,11 @@ through and everything below was then playtested in Studio.
 - **Lucky block** rides 30 studs down the belt in 3s and settles 7.3 studs from the
   CollectionArea; walking into it opens the menu.
 - **Hologram** legible from the hub floor above the leaderboards (screen captured).
+- **All three VFX fire**: merge effect on a merge, cash effect on the Collect Cash
+  pad, confetti on the group payout (and on rebirth). They were already wired in
+  session 2; nothing needed implementing, only proving.
+- **Magnetise speed** measured at 216ms from collect to reaching the player after
+  the second pass (Responsiveness 85, MaxVelocity 600).
 - Console clean across four play sessions -- no warnings, no errors. Cash, toilets
   and rebirth count survived all four restarts.
 - `ToiletService.pendingMerges` also run against 9 synthetic cases: cascades correct,
@@ -117,6 +122,11 @@ through and everything below was then playtested in Studio.
 
 ### Not verified / not done
 
+- `Workspace.Vfx` deleted: it was a byte-identical duplicate of
+  `ServerStorage.Assets.Vfx` (all three parts, same emitter rates, lifetimes,
+  speeds, textures and sizes -- compared before deleting) floating at
+  (227, 136, -76). The code only ever read the ServerStorage copy. **This is a
+  Workspace edit, so it needs the place saved to stick.**
 - The `2nd variant pillars` report from session 2 is still open and still unclarified.
 - The owner must still **save the place**: session 2's CastShadow fix (1,889 parts),
   the GroupJoinPad clones and the `PadKind` attribute correction are Workspace edits
