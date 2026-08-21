@@ -149,6 +149,156 @@ local function refresh(data: any, changed: any)
 	end
 end
 
+-- ── Flush Multiplier ───────────────────────────────────────────────────
+-- Its own ScreenGui, deliberately not a child of the HUD container: UIKit.pinEdges
+-- re-anchors everything in there to the nearest screen edge, and this belongs in the
+-- middle.
+--
+-- It hung in the world over the hub leaderboards until it had to be readable from a
+-- farm too. No world billboard can do that -- one shrinks with distance whichever
+-- unit it is sized in, and across the 200 studs from a farm to the hub it rendered
+-- as a speck while still reporting 520px of layout. The reference game's own
+-- multiplier is likewise invisible from its farms. On the HUD it is the same size
+-- everywhere, which is what was actually asked for.
+local function meterColour(mult: number): Color3
+	if mult >= 2 then return Color3.fromRGB(255, 215, 60) end
+	if mult >= 1.5 then return Color3.fromRGB(120, 255, 140) end
+	if mult >= 1.25 then return Color3.fromRGB(150, 230, 255) end
+	if mult >= 1 then return Color3.fromRGB(235, 235, 240) end
+	return Color3.fromRGB(255, 120, 120)
+end
+
+function Hud.buildFlushMeter()
+	local existing = gui:FindFirstChild("FlushMeterScreen")
+	if existing then existing:Destroy() end
+
+	local screen = Instance.new("ScreenGui")
+	screen.Name = "FlushMeterScreen"
+	screen.ResetOnSpawn = false
+	screen.IgnoreGuiInset = false
+	screen.DisplayOrder = 8
+	screen.Parent = gui
+
+	-- 40% of the width, top centre, clear of the Home button above it
+	local panel = Instance.new("Frame")
+	panel.Name = "Panel"
+	panel.AnchorPoint = Vector2.new(0.5, 0)
+	panel.Position = UDim2.fromScale(0.5, 0.075)
+	panel.Size = UDim2.fromScale(0.4, 0.1)
+	panel.BackgroundTransparency = 1
+	panel.Parent = screen
+
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.fromScale(1, 0.52)
+	title.BackgroundTransparency = 1
+	title.Font = Enum.Font.FredokaOne
+	title.TextScaled = true
+	title.TextColor3 = Color3.fromRGB(255, 205, 165)
+	title.Text = "Flush Multiplier: 1x"
+	local tls = Instance.new("UIStroke")
+	tls.Thickness = 3
+	tls.Color = Color3.new(0, 0, 0)
+	tls.Parent = title
+	title.Parent = panel
+
+	local track = Instance.new("Frame")
+	track.Name = "Track"
+	track.AnchorPoint = Vector2.new(0.5, 0)
+	track.Position = UDim2.fromScale(0.5, 0.56)
+	track.Size = UDim2.fromScale(0.94, 0.34)
+	track.BackgroundColor3 = Color3.new(1, 1, 1)
+	track.BorderSizePixel = 0
+	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(1, 0); tc.Parent = track
+	local ts = Instance.new("UIStroke"); ts.Thickness = 3; ts.Color = Color3.new(0, 0, 0); ts.Parent = track
+	-- The gradient is the SCALE, not a fill: it spans every multiplier the table can
+	-- roll, worst on the left to best on the right, so the pointer's position alone
+	-- says whether this roll was good.
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.0, Color3.fromRGB(235, 90, 80)),
+		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(245, 165, 50)),
+		ColorSequenceKeypoint.new(0.7, Color3.fromRGB(245, 225, 70)),
+		ColorSequenceKeypoint.new(1.0, Color3.fromRGB(85, 220, 90)),
+	})
+	grad.Parent = track
+	track.Parent = panel
+
+	-- the part of the scale beyond where this roll landed, dimmed back
+	local shade = Instance.new("Frame")
+	shade.Name = "Shade"
+	shade.AnchorPoint = Vector2.new(1, 0)
+	shade.Position = UDim2.fromScale(1, 0)
+	shade.Size = UDim2.fromScale(0.5, 1)
+	shade.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	shade.BackgroundTransparency = 0.55
+	shade.BorderSizePixel = 0
+	shade.ZIndex = 2
+	local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(1, 0); sc.Parent = shade
+	shade.Parent = track
+
+	local timer = Instance.new("TextLabel")
+	timer.Name = "Timer"
+	timer.Size = UDim2.fromScale(1, 1)
+	timer.BackgroundTransparency = 1
+	timer.Font = Enum.Font.FredokaOne
+	timer.TextScaled = true
+	timer.TextColor3 = Color3.new(1, 1, 1)
+	timer.Text = ""
+	timer.ZIndex = 4
+	local tp = Instance.new("UIPadding")
+	tp.PaddingTop = UDim.new(0.16, 0); tp.PaddingBottom = UDim.new(0.16, 0)
+	tp.Parent = timer
+	local tms = Instance.new("UIStroke"); tms.Thickness = 3; tms.Color = Color3.new(0, 0, 0); tms.Parent = timer
+	timer.Parent = track
+
+	-- the marker under the bar, pointing up at where this roll landed
+	local pointer = Instance.new("TextLabel")
+	pointer.Name = "Pointer"
+	pointer.AnchorPoint = Vector2.new(0.5, 0)
+	pointer.Size = UDim2.fromScale(0.05, 0.2)
+	pointer.Position = UDim2.fromScale(0.5, 0.9)
+	pointer.BackgroundTransparency = 1
+	pointer.Font = Enum.Font.FredokaOne
+	pointer.TextScaled = true
+	pointer.TextColor3 = Color3.new(0, 0, 0)
+	pointer.Text = "\u{25B2}"
+	pointer.ZIndex = 5
+	pointer.Parent = panel
+
+	-- where a multiplier sits along the scale: 0 at the worst roll the table can
+	-- produce, 1 at the best
+	local lowest, highest = math.huge, -math.huge
+	for _, e in ipairs(Config.FLUSH_METER.table) do
+		lowest = math.min(lowest, e.mult)
+		highest = math.max(highest, e.mult)
+	end
+
+	local function show(mult: number)
+		title.Text = ("Flush Multiplier: %sx"):format(mult)
+		title.TextColor3 = meterColour(mult)
+		local at = highest > lowest and math.clamp((mult - lowest) / (highest - lowest), 0, 1) or 0.5
+		-- the pointer rides the TRACK, which is 0.94 wide and centred, not the panel
+		pointer.Position = UDim2.fromScale(0.03 + at * 0.94, 0.9)
+		shade.Size = UDim2.fromScale(1 - at, 1)
+	end
+	show(1)
+
+	local state = { mult = 1, nextRollAt = 0 }
+	Net.event(Net.NAMES.FlushMeter).OnClientEvent:Connect(function(payload)
+		state = payload
+		show(payload.mult)
+	end)
+
+	task.spawn(function()
+		while screen.Parent do
+			task.wait(0.2)
+			local left = state.nextRollAt - workspace:GetServerTimeNow()
+			timer.Text = left > 0 and ("Updating in %ds"):format(math.ceil(left)) or "Updating..."
+		end
+	end)
+end
+
 -- ── init ───────────────────────────────────────────────────────────────
 function Hud.init()
 	screen = gui:WaitForChild("HudScreen_PoopBasket") :: ScreenGui
@@ -165,9 +315,7 @@ function Hud.init()
 	-- 1920x1080 letterbox, or an ultrawide leaves them stranded mid-screen
 	UIKit.bindScale(screen, true)
 
-	-- The Flush Multiplier is NOT on this screen. It is server-wide, so it lives as a
-	-- hologram over the hub leaderboards where everyone reads the same number --
-	-- see WorldFx.buildFlushHologram.
+	Hud.buildFlushMeter()
 
 	-- the price row is authored 71px wide and clipping, which fits two digits
 	local priceRow = C:FindFirstChild("RobuxRow")
