@@ -114,6 +114,12 @@ function EconomyService.deposit(player: Player)
 	-- `count` drives the "Deposited X Poops!" banner, `value` drives the cash maths
 	DepositedEvent:FireClient(player, { poops = value, count = items, cash = cash, multiplier = meter })
 	DataService.push(player, { poops = 0, poopItems = 0 })
+
+	-- banking a run is the payoff of the whole loop, so it gets the confetti
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if hrp and hrp:IsA("BasePart") then
+		require(script.Parent.VfxService).play("confetti", hrp.Position + Vector3.new(0, 1, 0), 30)
+	end
 	return items, cash
 end
 

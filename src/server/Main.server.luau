@@ -25,9 +25,12 @@ local LuckyBlockService = require(Services.LuckyBlockService)
 local TutorialService   = require(Services.TutorialService)
 local CodesService      = require(Services.CodesService)
 local PadService        = require(Services.PadService)
+local VfxService        = require(Services.VfxService)
 
 PassService.bindData(DataService)
 PassService.init()
+-- before anything can ask for an effect: it publishes the templates clients build from
+VfxService.init()
 DataService.init()
 PlotService.init()
 PoopService.init()
