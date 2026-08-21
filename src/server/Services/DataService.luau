@@ -246,6 +246,17 @@ function DataService.poopItemRate(player: Player): number
 	return total
 end
 
+-- The same rate with the PURCHASED multipliers taken back out. The buy price is
+-- keyed off this: DoublePoop doubles poopRate, so pricing off the raw figure would
+-- charge a player double for every toilet because they bought a gamepass. Rebirth
+-- and perk multipliers stay in -- those are earned, and a tycoon is supposed to get
+-- dearer as you rebirth into more income.
+function DataService.poopRateBase(player: Player): number
+	local rate = DataService.poopRate(player)
+	if DataService.hasPass(player, "DoublePoop") then rate /= 2 end
+	return rate
+end
+
 -- ── load / save ───────────────────────────────────────────────────────────
 -- Every write goes through UpdateAsync so the read-modify-write is atomic against
 -- other servers, and so a save can refuse to clobber a profile this server no

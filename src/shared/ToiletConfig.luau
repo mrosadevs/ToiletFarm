@@ -66,25 +66,32 @@ end
 Config.BUY_SCALE_COEFF    = 0.4366
 Config.BUY_SCALE_EXPONENT = 0.871
 
--- ── Balance price scaling ────────────────────────────────────
--- The farm-size curve alone lets a rich player buy the pads out for pocket change:
--- sitting on $30M, 100 toilets for $300k is a rounding error. So the unit price also
--- has a FLOOR set by what the player is holding. A full 100 batch costs BITE of the
--- balance and the smaller pads cost proportionally less, so a purchase always costs
--- something that matters however far ahead of the curve the balance has run.
+-- ── Production price scaling ────────────────────────────────
+-- The price must NEVER key off the player's cash. Three readings from the reference
+-- game settle it: the balance ran $21.67M -> $6.66M -> $12.89M while the price held
+-- at $13.65M for 100 to the dollar, moving only when the flock itself grew (82,701
+-- -> 83,274). Their curve works out at an exponent of 0.851 against our 0.871, so
+-- the farm-size curve above is already their rule.
 --
--- It is a floor, never a discount: a player who is behind the curve still pays the
--- curve. And because the quote is taken once per batch and the balance falls as it
--- is spent, the price falls with it -- there is no way to price yourself out.
-Config.BUY_BALANCE_BITE  = 0.25
-Config.BUY_BALANCE_BATCH = 100
+-- What it does not survive is our income running hot for a given farm size: that
+-- curve alone left 100 toilets at a few hundred thousand while the player sat on
+-- $30M+. So there is a second floor, and it is a property of the FARM rather than
+-- the wallet -- what the toilets produce per second. It holds still when you spend
+-- or collect, exactly like the flock count does, and only moves when the farm does.
+-- A full 100 batch costs about BUY_PRODUCTION_SECONDS of the farm's output.
+--
+-- Deliberately measured on the raw poop value, not on cash earned: folding in the
+-- cash multiplier would put the price up for owning the x2 gamepass, which is
+-- charging a player for buying something.
+Config.BUY_PRODUCTION_SECONDS = 300
+Config.BUY_PRODUCTION_BATCH   = 100
 
-function Config.buyCostFor(tier: number, totalToilets: number, cash: number?): number
+function Config.buyCostFor(tier: number, totalToilets: number, poopRate: number?): number
 	local markup = 1 + Config.BUY_SCALE_COEFF * math.max(totalToilets, 0) ^ Config.BUY_SCALE_EXPONENT
 	local curve = Config.buyCost(tier) * markup
 	local floor = 0
-	if cash and cash > 0 then
-		floor = cash * Config.BUY_BALANCE_BITE / Config.BUY_BALANCE_BATCH
+	if poopRate and poopRate > 0 then
+		floor = poopRate * Config.BUY_PRODUCTION_SECONDS / Config.BUY_PRODUCTION_BATCH
 	end
 	return math.floor(math.max(curve, floor))
 end
