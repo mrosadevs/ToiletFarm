@@ -389,6 +389,43 @@ function EconomyService.claimOffline(player: Player, doubled: boolean?)
 	return true
 end
 
+-- ── group reward pad ─────────────────────────────────────
+-- Seconds until the pad can pay this player again; 0 means it is ready. The
+-- cooldown is wall-clock in the profile, not os.clock(), so hopping servers does
+-- not reset it.
+function EconomyService.groupRewardCooldown(player: Player): number
+	local p = DataService.get(player)
+	if not p then return Config.GROUP_REWARD.cooldown end
+	local now = os.time()
+	local last = tonumber(p.lastGroupRewardAt) or 0
+	if last <= 0 or last > now then return 0 end
+	return math.max(0, Config.GROUP_REWARD.cooldown - (now - last))
+end
+
+-- The membership check belongs to the caller: the pad decides whether to pay out
+-- or to raise the join prompt.
+function EconomyService.groupReward(player: Player, worldPos: Vector3?)
+	local p = DataService.get(player)
+	if not p then return end
+
+	local left = EconomyService.groupRewardCooldown(player)
+	if left > 0 then
+		toast(player, ("Group reward in %dm %ds"):format(left // 60, left % 60), "error")
+		return
+	end
+
+	local amount = Config.groupReward(p.cash)
+	p.lastGroupRewardAt = os.time()
+	p.cash += amount
+	DataService.push(player, { cash = p.cash })
+	CashEvent:FireClient(player, { amount = amount, pos = worldPos })
+	toast(player, ("Thanks for joining! +%s"):format(Format.cash(amount)), "reward")
+	if worldPos then
+		require(script.Parent.VfxService).play("confetti", worldPos + Vector3.new(0, 2, 0))
+	end
+	return amount
+end
+
 -- ── free money chest ────────────────────────────────────────────────────
 local CHEST_COOLDOWN = 600
 

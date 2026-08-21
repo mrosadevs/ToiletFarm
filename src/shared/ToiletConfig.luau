@@ -453,6 +453,20 @@ function Config.offlineItems(itemRateAtLogout: number, secondsAway: number, hasP
 	return math.floor(itemRateAtLogout * t * Config.OFFLINE_RATE)
 end
 
+-- ── Group reward pad ─────────────────────────────────────────
+-- Standing on the group pad pays out every ten minutes, but only for members.
+-- It is deliberately a slice of the balance rather than a flat sum: a fixed
+-- number is either meaningless by the second rebirth or absurd on the first day.
+Config.GROUP_REWARD = {
+	cooldown = 600,
+	floor    = 500,    -- what a brand new farm gets
+	share    = 0.12,   -- ...or this much of the balance, whichever is larger
+}
+
+function Config.groupReward(cash: number): number
+	return math.max(Config.GROUP_REWARD.floor, math.floor((cash or 0) * Config.GROUP_REWARD.share))
+end
+
 -- ── Cash packs ───────────────────────────────────────────────────────────
 -- The three green buttons down the left of the HUD. What they pay scales with the
 -- player's current balance, so they stay meaningful at every stage instead of

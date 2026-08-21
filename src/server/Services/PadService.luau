@@ -28,6 +28,42 @@ local PadService = {}
 -- connects at startup, times out waiting for it.
 local GroupJoinEvent = Net.event(Net.NAMES.PromptGroupJoin)
 
+-- The group that owns this place. Read from game.CreatorId rather than pasted in,
+-- so it cannot drift if the game is ever moved to another group.
+local GROUP_ID = (game.CreatorType == Enum.CreatorType.Group) and game.CreatorId or 0
+
+-- Player:IsInGroup is answered from a snapshot taken when the player joined, so
+-- someone who accepts the prompt mid-session still reads as a non-member. A web
+-- refresh fixes that, but it is a web call: only the touch handler may ask for
+-- one, the label refresh reads the cache, and a miss is not retried for RECHECK
+-- seconds.
+local RECHECK = 20
+local groupCache: { [Player]: { member: boolean, at: number } } = {}
+
+local function isGroupMember(player: Player, allowRefresh: boolean?): boolean
+	if GROUP_ID == 0 then return false end
+	local cached = groupCache[player]
+	if cached and cached.member then return true end
+	if player:IsInGroup(GROUP_ID) then
+		groupCache[player] = { member = true, at = os.clock() }
+		return true
+	end
+	if not allowRefresh then return false end
+	if cached and os.clock() - cached.at < RECHECK then return false end
+
+	local member = false
+	local ok, groups = pcall(function()
+		return game:GetService("GroupService"):GetGroupsAsync(player.UserId)
+	end)
+	if ok and type(groups) == "table" then
+		for _, g in ipairs(groups) do
+			if g.Id == GROUP_ID then member = true break end
+		end
+	end
+	groupCache[player] = { member = member, at = os.clock() }
+	return member
+end
+
 -- A floor under deliberate re-steps only; the real once-per-step guard is the
 -- contact counting in bindPlate.
 local COOLDOWN = {
@@ -172,6 +208,23 @@ local function refreshPad(pad: Model, player: Player)
 			-- it costs toilets AND cash, and either shortfall is "you cannot buy this yet"
 			paint(pad, (hasToilets and p.cash >= cost) and PLATE.ready or PLATE.denied)
 		end
+	elseif kind == "GroupJoinPad" then
+		-- Reads the membership CACHE only. Refreshing it is a web call and this runs
+		-- four times a second.
+		if not isGroupMember(player) then
+			if quantity then quantity.Text = "Join The Group" end
+			if price then price.Text = "Free Cash!" end
+			paint(pad, PLATE.inactive)
+		else
+			local left = EconomyService.groupRewardCooldown(player)
+			if quantity then quantity.Text = "Group Reward" end
+			if price then
+				price.Text = left > 0
+					and ("Ready in %d:%02d"):format(left // 60, left % 60)
+					or ("$" .. Format.cash(Config.groupReward(p.cash)))
+			end
+			paint(pad, left > 0 and PLATE.inactive or PLATE.ready)
+		end
 	elseif kind == "MergePad" then
 		if quantity then quantity.Text = "Merge All" end
 		if price then price.Text = "" end
@@ -311,22 +364,22 @@ handlers.FinishNowPad = function(player)
 	MarketplaceService:PromptProductPurchase(player, id)
 end
 
--- The group that owns this place. Read from game.CreatorId rather than pasted in,
--- so it cannot drift if the game is ever moved to another group.
-local GROUP_ID = (game.CreatorType == Enum.CreatorType.Group) and game.CreatorId or 0
-
-handlers.GroupJoinPad = function(player)
+-- Members collect cash here every ten minutes. Everyone else gets the join prompt
+-- and nothing else -- the reward is the reason to join, so it cannot pay out first.
+handlers.GroupJoinPad = function(player, pad)
 	if GROUP_ID == 0 then
 		Net.event(Net.NAMES.Toast):FireClient(player, "No group set up yet!", "error")
 		return
 	end
-	if player:IsInGroup(GROUP_ID) then
-		Net.event(Net.NAMES.Toast):FireClient(player, "You're already in the group. Thanks!", "info")
+	if not isGroupMember(player, true) then
+		-- GroupService:PromptJoinAsync only exists on the client, so ask the client to
+		-- raise it rather than trying to prompt from here.
+		GroupJoinEvent:FireClient(player, GROUP_ID)
+		Net.event(Net.NAMES.Toast):FireClient(player, "Join the group to collect this!", "info")
 		return
 	end
-	-- GroupService:PromptJoinAsync only exists on the client, so ask the client to
-	-- raise it rather than trying to prompt from here.
-	GroupJoinEvent:FireClient(player, GROUP_ID)
+	local plate = pad:FindFirstChild("Plate") :: BasePart?
+	EconomyService.groupReward(player, plate and plate.Position)
 end
 
 local function promptPass(passName: string)
@@ -460,7 +513,85 @@ function PadService.runSellZone()
 	end
 end
 
+-- Every plot has a GroupJoinPad, but the clones were never moved off the plot they
+-- were copied from -- all six sat stacked on one farm, so five islands had no
+-- visible pad and one had a pile of them. Re-seat each at the same plot-relative
+-- CFrame as the one pad that is already sitting on its own island.
+local function reseatGroupPads()
+	local plots = workspace:FindFirstChild("Plots")
+	if not plots then return end
+
+	local found: { { pad: Model, plot: Instance } } = {}
+	for _, plot in ipairs(plots:GetChildren()) do
+		if plot:IsA("Model") then
+			for _, d in ipairs(plot:GetDescendants()) do
+				if d:IsA("Model") and d:GetAttribute("PadKind") == "GroupJoinPad" then
+					table.insert(found, { pad = d, plot = plot })
+				end
+			end
+		end
+	end
+	if #found < 2 then return end
+
+	-- the reference is whichever pad is nearest the plot it actually belongs to
+	local ref, best = nil, math.huge
+	for _, e in ipairs(found) do
+		local d = (e.pad:GetPivot().Position - (e.plot :: Model):GetPivot().Position).Magnitude
+		if d < best then ref, best = e, d end
+	end
+	if not ref then return end
+
+	local rel = (ref.plot :: Model):GetPivot():ToObjectSpace(ref.pad:GetPivot())
+	for _, e in ipairs(found) do
+		e.pad:PivotTo((e.plot :: Model):GetPivot() * rel)
+	end
+end
+
+-- The group pad was authored without a billboard, so it had nothing to say. Clone
+-- the one off a neighbouring pad on the same plot rather than building one from
+-- scratch, so it matches the rest of the farm exactly.
+local function ensureGroupBillboard(pad: Model)
+	for _, d in ipairs(pad:GetDescendants()) do
+		if d:IsA("BillboardGui") then return end
+	end
+	local plots = workspace:FindFirstChild("Plots")
+	local plot = pad.Parent
+	while plot and plot.Parent ~= plots do plot = plot.Parent end
+	if not plot then return end
+
+	-- Prefer one specific neighbour: whichever Text attachment turns up first varies
+	-- from plot to plot (a DepositPad on one, a BuyButton on another), and the group
+	-- pad should look the same on every farm.
+	local donor: Attachment? = nil
+	local fallback: Attachment? = nil
+	for _, d in ipairs(plot:GetDescendants()) do
+		if d:IsA("Attachment") and d.Name == "Text" and d:FindFirstChildOfClass("BillboardGui") then
+			local owner = d:FindFirstAncestorOfClass("Model")
+			if owner and owner:GetAttribute("PadKind") == "CollectCashPad" then
+				donor = d
+				break
+			end
+			fallback = fallback or d
+		end
+	end
+	donor = donor or fallback
+	local host = pad:FindFirstChild("Part") or pad:FindFirstChild("Plate")
+	if not donor or not host or not host:IsA("BasePart") then return end
+
+	local copy = donor:Clone()
+	local sub = copy:FindFirstChild("SubLabel", true)
+	if sub then sub:Destroy() end
+	copy.Parent = host
+end
+
 function PadService.init()
+	reseatGroupPads()
+	for _, pad in ipairs(CollectionService:GetTagged("Pad")) do
+		if pad:IsA("Model") and pad:GetAttribute("PadKind") == "GroupJoinPad" then
+			ensureGroupBillboard(pad)
+		end
+	end
+
 	-- PadTouch is a tall invisible volume above each plate; the plates themselves are
 	-- barely 0.15 studs thick and flush with the ground, so walking over one does not
 	-- reliably fire Touched on its own.
@@ -473,6 +604,7 @@ function PadService.init()
 
 	Players.PlayerRemoving:Connect(function(player)
 		lastTouch[player] = nil
+		groupCache[player] = nil
 		for _, contacts in pairs(occupancy) do contacts[player] = nil end
 	end)
 

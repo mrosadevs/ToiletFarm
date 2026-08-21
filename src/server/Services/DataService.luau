@@ -81,6 +81,8 @@ function DataService.default()
 		-- os.time() of the last free-money chest claim. Persisted because an
 		-- uptime-based cooldown resets every time the player changes server.
 		lastChestAt   = 0,
+		-- os.time() of the last group-pad payout, persisted for the same reason
+		lastGroupRewardAt = 0,
 		lastLogout    = 0,
 		-- Two rates, because offline pay has to arrive in both currencies: the value
 		-- the basket banks and the item count the basket displays. Crediting only the
