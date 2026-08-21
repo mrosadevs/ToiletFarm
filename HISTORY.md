@@ -99,6 +99,14 @@ through and everything below was then playtested in Studio.
   session 2; nothing needed implementing, only proving.
 - **Magnetise speed** measured at 216ms from collect to reaching the player after
   the second pass (Responsiveness 85, MaxVelocity 600).
+- **Flush Multiplier rebuilt to the reference's design** (`3d1a310`): one title line
+  carrying the value over a long thin scale coloured across the whole roll range,
+  with a pointer showing where the roll landed. Three traps found by testing it:
+  a scale-sized BillboardGui renders NOTHING with `AlwaysOnTop = true` (the widget
+  vanished outright); below `highest + 6` the nearest leaderboard cuts across the
+  bar; above it the HUD's Home button clips the title. The content sits low inside
+  the board to buy that clearance without shrinking the text. MaxDistance 170 so it
+  belongs to the hub, as the reference's does.
 - **Pad colouring moved to the button.** The first pass painted `Plate` -- the brown
   wooden base every pad shares -- which turned the whole pad into a slab of colour.
   `Part` is the button on top. Every button also has its own authored colour (Buy
@@ -107,12 +115,22 @@ through and everything below was then playtested in Studio.
   from there. Verified on a live farm -- all plates still 107,79,60, buttons showing
   their own colours, red on Upgrade/Processing, grey on Merge and the cooling group
   pad. `1600a74`
-- **Toilet prices now have a balance floor** (`7ab4ca1`). The farm-size curve alone
-  charged $2.2k a toilet while the player sat on $32M. A full 100 batch now costs a
-  quarter of the balance, smaller pads proportionally less; it is a max() with the
-  curve, so a player behind the curve still pays the curve and the early game is
-  untouched. Measured at $32.6M: $81,504 / $408K / $2.04M / $8.15M for 1 / 5 / 25 /
-  100, and the quote charged matches the quote displayed.
+- **Toilet prices: balance floor added (`7ab4ca1`), then replaced by a PRODUCTION
+  floor (`d2c21cc`) once reference screenshots arrived.** Four shots of the game this
+  one is modelled on settle it: the wallet ran $21.67M -> $6.66M -> $12.89M while 100
+  Ducks held at $13.65M to the dollar, moving only when the flock grew 82,701 ->
+  83,274. Egg inventory drifted 2.08B -> 2.06B with the price unmoved. Their exponent
+  works out at 0.851 against our 0.871 -- the farm-size curve was already their rule,
+  and keying anything off cash was simply wrong. The floor is now the farm's output
+  per second, measured on `DataService.poopRateBase` so that owning DoublePoop does
+  not double the price of every toilet. `BUY_PRODUCTION_SECONDS = 300`.
+
+  Worth recording honestly, because the two ways of measuring disagree: against the
+  BALANCE our prices looked ~13x too cheap, but against INCOME they were already ~3x
+  stiffer than the reference. Their player holds about 15 seconds of income; this
+  save holds about 13 minutes of it, inflated by test-session offline claims, group
+  payouts and dev cash. 300 seconds is a middle setting picked knowing that, not a
+  fitted number -- it is one constant to turn.
 - Console clean across four play sessions -- no warnings, no errors. Cash, toilets
   and rebirth count survived all four restarts.
 - `ToiletService.pendingMerges` also run against 9 synthetic cases: cascades correct,
