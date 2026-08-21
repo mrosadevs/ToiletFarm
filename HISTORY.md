@@ -136,6 +136,33 @@ through and everything below was then playtested in Studio.
 - `ToiletService.pendingMerges` also run against 9 synthetic cases: cascades correct,
   9 x T1 reports 4, not 3.
 
+### Late session, after live feedback
+
+- **The particle effects were firing and nobody could see them** (`e8d9f51`).
+  `:Emit()` replicates as an EVENT to clients that already have the part, and the
+  server was emitting in the same frame it parented the carrier, so the emit landed
+  before the part did. Emitter lifetimes are 0.3-1.0s, so there is no second chance.
+  **Counting effect parts appearing in Workspace -- how I "verified" this earlier in
+  the session -- proves the server ran and says nothing about whether anything was
+  drawn.** Templates are published to ReplicatedStorage at boot now and the server
+  only broadcasts "play KEY at POSITION"; each client builds and emits locally.
+  Deposit gained the confetti it never had. Re-verified by probing on the CLIENT:
+  merge(5 emitters), confetti(5), cash(7), cash(7) built locally.
+- **Flush Multiplier moved from the world to the HUD** (`42fb42c`). This reverses the
+  world placement asked for in session 2, and it is a real trade, not an oversight: a
+  BillboardGui shrinks with distance whichever unit it is sized in -- measured at 200
+  studs it reported 520px of layout and rendered as a speck -- so "shared object in
+  the hub" and "visible from my farm" cannot both hold. The reference game's own
+  multiplier is likewise invisible from its farms. Now a ScreenGui at 40% width, top
+  centre, same design.
+- **Droppings count by tier** (`8859e4b`). A T8 toilet whose drop the basket counted
+  as "1" read as though the tier did nothing. `Config.poopCount(tier)` = the tier, so
+  T8 drops are 8 and T30 are 30 -- nothing like the value curve (3.6^tier), which
+  would make the basket meaningless in a few tiers. Cash per poop is unchanged, so
+  this is feel rather than income. Pickup popups quote the same number; the offline
+  item rate is weighted to match. Verified: Count 2/3/4/8 by tier, 75 droppings
+  credited 266, popups reading +4/+3/+4.
+
 ### Found while testing
 
 - **The Upgrade Buy Tier pad had no BillboardGui at all**, on any farm. refreshPad
@@ -179,6 +206,12 @@ through and everything below was then playtested in Studio.
 3. Decide the group reward numbers ($4.81M on a $40M balance) after living with them.
 4. Check whether the magnetise still reads smoothly with several players collecting
    at once -- it was tested single-player.
+5. **The economy has NOT been balanced end to end.** `Config.poopCount` changed what
+   the basket reads, not what anything earns, and `BUY_PRODUCTION_SECONDS` is a
+   single hand-picked constant. Nobody has played a fresh save from $10 to a rebirth
+   with these numbers. The knobs are INCOME_RATIO / COST_RATIO, BUY_SCALE_COEFF /
+   BUY_SCALE_EXPONENT, BUY_PRODUCTION_SECONDS and the rebirth table, and they want
+   one deliberate pass together rather than another nudge each session.
 
 ---
 
