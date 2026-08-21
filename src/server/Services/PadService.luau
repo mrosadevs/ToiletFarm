@@ -104,23 +104,39 @@ local function labels(pad: Model): (TextLabel?, TextLabel?, TextLabel?)
 	return quantity, price, sub
 end
 
--- Plate colours. A pad has to read as one of three things from across the farm:
---   ready     walk on it and it does something
---   denied    the action is live but you cannot pay for it yet
---   inactive  nothing to do here at all -- maxed out, locked behind a rebirth,
+-- A pad has to read as one of three things from across the farm:
+--   ready     the pad's own colour -- green to buy, yellow to merge, purple to upgrade
+--   denied    red: the action is live but you cannot pay for it yet
+--   inactive  grey: nothing to do here at all -- maxed out, locked behind a rebirth,
 --             or, on the Merge pad, nothing to act on
 -- Unaffordable used to share the grey with maxed-out, so a pad you had simply
 -- outgrown and one you were two dollars short of looked identical.
-local PLATE = {
-	ready    = Color3.fromRGB(107,  79,  60),
-	denied   = Color3.fromRGB(178,  52,  52),
-	inactive = Color3.fromRGB(110, 110, 118),
-}
+--
+-- The BUTTON is what changes colour. `Plate` is the brown wooden base every pad
+-- stands on, and repainting that turned the whole pad into a slab of colour. Each
+-- button also has its OWN authored colour, so there is no single "ready" shade to
+-- return to: the original is stashed on the part the first time it is seen and put
+-- back from there.
+local PAD = { ready = "ready", denied = "denied", inactive = "inactive" }
+local DENIED = Color3.fromRGB(178, 52, 52)
+local INACTIVE = Color3.fromRGB(110, 110, 118)
 
-local function paint(pad: Model, colour: Color3)
-	local plate = pad:FindFirstChild("Plate") :: BasePart?
+local function paint(pad: Model, state: string)
+	local button = pad:FindFirstChild("Part") :: BasePart?
+	if not button then return end
+
+	local authored = button:GetAttribute("ReadyColor")
+	if typeof(authored) ~= "Color3" then
+		-- first sight, before anything has been overridden
+		authored = button.Color
+		button:SetAttribute("ReadyColor", authored)
+	end
+
+	local want = (state == PAD.denied and DENIED)
+		or (state == PAD.inactive and INACTIVE)
+		or authored
 	-- guarded: this runs 4x a second per pad, and an unchanged write still replicates
-	if plate and plate.Color ~= colour then plate.Color = colour end
+	if button.Color ~= want then button.Color = want end
 end
 
 -- pads that sell a gamepass or dev product, and which one
@@ -148,7 +164,7 @@ local function refreshPad(pad: Model, player: Player)
 		pad:SetAttribute("PreviewTier", tier)
 
 		-- this pad always has something to sell, so the only failure is the price
-		paint(pad, (tier ~= nil and p.cash >= unit * amount) and PLATE.ready or PLATE.denied)
+		paint(pad, (tier ~= nil and p.cash >= unit * amount) and PAD.ready or PAD.denied)
 	elseif kind == "CollectCashPad" then
 		if quantity then quantity.Text = "Collect Cash" end
 		if price then price.Text = "$" .. Format.cash(EconomyService.pendingCash(player)) end
@@ -165,9 +181,9 @@ local function refreshPad(pad: Model, player: Player)
 		if price then price.Text = cost and ("$" .. Format.cash(cost)) or "MAX" end
 
 		if cost == nil then
-			paint(pad, PLATE.inactive) -- fully upgraded, not too expensive
+			paint(pad, PAD.inactive) -- fully upgraded, not too expensive
 		else
-			paint(pad, p.cash >= cost and PLATE.ready or PLATE.denied)
+			paint(pad, p.cash >= cost and PAD.ready or PAD.denied)
 		end
 
 	elseif kind == "DepositPad" then
@@ -180,9 +196,9 @@ local function refreshPad(pad: Model, player: Player)
 		if price then price.Text = cost and ("$" .. Format.cash(cost)) or "" end
 
 		if cost == nil then
-			paint(pad, PLATE.inactive) -- MAX REBIRTH
+			paint(pad, PAD.inactive) -- MAX REBIRTH
 		else
-			paint(pad, p.cash >= cost and PLATE.ready or PLATE.denied)
+			paint(pad, p.cash >= cost and PAD.ready or PAD.denied)
 		end
 	elseif kind == "UpgradeBuyTierPad" then
 		local tier = p.buyTier or 1
@@ -190,7 +206,7 @@ local function refreshPad(pad: Model, player: Player)
 		if tier >= ceiling then
 			if quantity then quantity.Text = "Upgrade Buy Tier" end
 			if price then price.Text = ("[REQ: Rebirth %d]"):format(p.rebirths + 1) end
-			paint(pad, PLATE.inactive) -- no amount of cash opens this until you rebirth
+			paint(pad, PAD.inactive) -- no amount of cash opens this until you rebirth
 		else
 			if quantity then
 				quantity.Text = ("Upgrade Buy Tier\n%s > %s")
@@ -206,7 +222,7 @@ local function refreshPad(pad: Model, player: Player)
 					or ("%s / %s Toilets"):format(Format.short(owned), Format.short(need))
 			end
 			-- it costs toilets AND cash, and either shortfall is "you cannot buy this yet"
-			paint(pad, (hasToilets and p.cash >= cost) and PLATE.ready or PLATE.denied)
+			paint(pad, (hasToilets and p.cash >= cost) and PAD.ready or PAD.denied)
 		end
 	elseif kind == "GroupJoinPad" then
 		-- Reads the membership CACHE only. Refreshing it is a web call and this runs
@@ -214,7 +230,7 @@ local function refreshPad(pad: Model, player: Player)
 		if not isGroupMember(player) then
 			if quantity then quantity.Text = "Join The Group" end
 			if price then price.Text = "Free Cash!" end
-			paint(pad, PLATE.inactive)
+			paint(pad, PAD.inactive)
 		else
 			local left = EconomyService.groupRewardCooldown(player)
 			if quantity then quantity.Text = "Group Reward" end
@@ -223,14 +239,14 @@ local function refreshPad(pad: Model, player: Player)
 					and ("Ready in %d:%02d"):format(left // 60, left % 60)
 					or ("$" .. Format.cash(Config.groupReward(p.cash)))
 			end
-			paint(pad, left > 0 and PLATE.inactive or PLATE.ready)
+			paint(pad, left > 0 and PAD.inactive or PAD.ready)
 		end
 	elseif kind == "MergePad" then
 		if quantity then quantity.Text = "Merge All" end
 		if price then price.Text = "" end
 		-- Grey with nothing to merge. Stepping on it in that state can only ever
 		-- produce the "you need 3 of a kind" toast, so say so before the player walks.
-		paint(pad, ToiletService.pendingMerges(player) > 0 and PLATE.ready or PLATE.inactive)
+		paint(pad, ToiletService.pendingMerges(player) > 0 and PAD.ready or PAD.inactive)
 	elseif kind == "FreeMoneyPad" then
 		-- no hologram: this pad has its own FreeMoneySign board, and the billboard
 		-- floated high above the septic area where it read as a stray label
