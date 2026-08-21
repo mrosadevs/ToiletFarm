@@ -25,31 +25,42 @@ function UIKit.pinEdges(container: GuiObject, design: Vector2)
 	-- anything whose centre lands within this much of the middle stays centred
 	local CENTRE_BAND = 0.10
 
+	-- Resolve a UDim against the design span. The Figma export leaves floating-point
+	-- noise in the scale terms (a child at x=1748 carries scale=-0.000154), so these
+	-- must be FOLDED IN rather than compared to zero — testing `scale == 0` was false
+	-- for every child, which silently skipped the whole pass.
+	local function resolve(d: UDim, span: number): number
+		return d.Scale * span + d.Offset
+	end
+
 	for _, child in ipairs(container:GetChildren()) do
 		if child:IsA("GuiObject") then
-			local pos, size = child.Position, child.Size
-			-- only untouched, top-left anchored children are safe to re-anchor
-			if pos.X.Scale == 0 and pos.Y.Scale == 0 and child.AnchorPoint == Vector2.zero then
-				local w = size.X.Offset + size.X.Scale * design.X
-				local h = size.Y.Offset + size.Y.Scale * design.Y
+			local pos, size, anchor = child.Position, child.Size, child.AnchorPoint
+			local w = resolve(size.X, design.X)
+			local h = resolve(size.Y, design.Y)
+			-- top-left corner in design space, whatever the child's anchor is
+			local left = resolve(pos.X, design.X) - anchor.X * w
+			local top = resolve(pos.Y, design.Y) - anchor.Y * h
 
-				local function axis(offset: number, extent: number, span: number): (number, UDim)
-					local centre = offset + extent / 2
-					local middle = span / 2
-					if math.abs(centre - middle) < span * CENTRE_BAND then
-						return 0.5, UDim.new(0.5, centre - middle)
-					elseif centre > middle then
-						-- far edge: position now refers to the child's far edge
-						return 1, UDim.new(1, -(span - (offset + extent)))
-					end
-					return 0, UDim.new(0, offset)
+			local function axis(offset: number, extent: number, span: number): (number, UDim)
+				local centre = offset + extent / 2
+				local middle = span / 2
+				if math.abs(centre - middle) < span * CENTRE_BAND then
+					return 0.5, UDim.new(0.5, centre - middle)
+				elseif centre > middle then
+					-- far edge: position now refers to the child's far edge
+					return 1, UDim.new(1, -(span - (offset + extent)))
 				end
-
-				local ax, px = axis(pos.X.Offset, w, design.X)
-				local ay, py = axis(pos.Y.Offset, h, design.Y)
-				child.AnchorPoint = Vector2.new(ax, ay)
-				child.Position = UDim2.new(px.Scale, px.Offset, py.Scale, py.Offset)
+				return 0, UDim.new(0, offset)
 			end
+
+			local ax, px = axis(left, w, design.X)
+			local ay, py = axis(top, h, design.Y)
+			child.AnchorPoint = Vector2.new(ax, ay)
+			child.Position = UDim2.new(px.Scale, px.Offset, py.Scale, py.Offset)
+			-- drop the scale noise from Size too, or the child rescales with the
+			-- container now that the container is no longer the design size
+			child.Size = UDim2.fromOffset(w, h)
 		end
 	end
 end
@@ -95,8 +106,11 @@ function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
 			-- The UIScale multiplies the container's own size too, so asking for
 			-- viewport/scale in design space renders as exactly the viewport: one
 			-- uniform scale, no stretching, and the edges are the real screen edges.
-			container.AnchorPoint = Vector2.new(0.5, 0.5)
-			container.Position = UDim2.fromScale(0.5, 0.5)
+			-- Pin the top-left rather than centring: the ScreenGui's usable area starts
+			-- below the Roblox topbar, and centring pushed the container 58px above it,
+			-- clipping the Home button off the top of the screen.
+			container.AnchorPoint = Vector2.zero
+			container.Position = UDim2.fromOffset(0, 0)
 			container.Size = UDim2.fromOffset(vp.X / s, vp.Y / s)
 		end
 	end
