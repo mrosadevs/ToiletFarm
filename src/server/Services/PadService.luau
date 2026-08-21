@@ -257,6 +257,11 @@ handlers.FinishNowPad = function(player)
 	MarketplaceService:PromptProductPurchase(player, id)
 end
 
+handlers.GroupJoinPad = function(player)
+	local groupId = 16284220
+	player:PromptGroupRankChange(groupId)
+end
+
 local function promptPass(passName: string)
 	return function(player: Player)
 		local id = PassService.passId(passName)
