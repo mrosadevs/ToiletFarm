@@ -66,9 +66,27 @@ end
 Config.BUY_SCALE_COEFF    = 0.4366
 Config.BUY_SCALE_EXPONENT = 0.871
 
-function Config.buyCostFor(tier: number, totalToilets: number): number
+-- ── Balance price scaling ────────────────────────────────────
+-- The farm-size curve alone lets a rich player buy the pads out for pocket change:
+-- sitting on $30M, 100 toilets for $300k is a rounding error. So the unit price also
+-- has a FLOOR set by what the player is holding. A full 100 batch costs BITE of the
+-- balance and the smaller pads cost proportionally less, so a purchase always costs
+-- something that matters however far ahead of the curve the balance has run.
+--
+-- It is a floor, never a discount: a player who is behind the curve still pays the
+-- curve. And because the quote is taken once per batch and the balance falls as it
+-- is spent, the price falls with it -- there is no way to price yourself out.
+Config.BUY_BALANCE_BITE  = 0.25
+Config.BUY_BALANCE_BATCH = 100
+
+function Config.buyCostFor(tier: number, totalToilets: number, cash: number?): number
 	local markup = 1 + Config.BUY_SCALE_COEFF * math.max(totalToilets, 0) ^ Config.BUY_SCALE_EXPONENT
-	return math.floor(Config.buyCost(tier) * markup)
+	local curve = Config.buyCost(tier) * markup
+	local floor = 0
+	if cash and cash > 0 then
+		floor = cash * Config.BUY_BALANCE_BITE / Config.BUY_BALANCE_BATCH
+	end
+	return math.floor(math.max(curve, floor))
 end
 
 function Config.dropInterval(_tier: number): number

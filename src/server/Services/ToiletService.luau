@@ -54,7 +54,9 @@ end
 -- "Buy 25" exactly 25x the "Buy 1" figure on the pads, as in the reference game.
 function ToiletService.bestAffordableTier(player: Player): (number?, number?)
 	local tier = ToiletService.currentBuyTier(player)
-	return tier, Config.buyCostFor(tier, ToiletService.totalToilets(player))
+	local p = DataService.get(player)
+	-- the balance goes in too, so the price cannot fall behind what the player holds
+	return tier, Config.buyCostFor(tier, ToiletService.totalToilets(player), p and p.cash)
 end
 
 -- what the button should display: tier and unit price of the next purchase
