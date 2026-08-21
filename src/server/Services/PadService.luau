@@ -22,14 +22,18 @@ local TutorialService = require(script.Parent.TutorialService)
 
 local PadService = {}
 
+-- A floor under deliberate re-steps only; the real once-per-step guard is the
+-- contact counting in bindPlate.
 local COOLDOWN = {
-	BuyButton = 1.0, MergePad = 0.5, DepositPad = 0.35, CollectCashPad = 0.25,
+	BuyButton = 0.25, MergePad = 0.5, DepositPad = 0.35, CollectCashPad = 0.25,
 	RebirthPad = 1.0, FreeMoneyPad = 1.0, ProcessingPad = 0.4,
 }
 local DEFAULT_COOLDOWN = 0.6
 
 local lastTouch: { [Player]: { [Model]: number } } = {}
 local warned: { [Instance]: boolean } = {}
+-- who is currently standing on each plate: plate -> player -> contact count
+local occupancy: { [BasePart]: { [Player]: number } } = {}
 
 local function onCooldown(player: Player, pad: Model): boolean
 	local kind = pad:GetAttribute("PadKind")
@@ -328,9 +332,20 @@ local function bindPlate(plate: BasePart)
 	if not pad then return end
 	local padModel = pad :: Model
 
+	-- Every pad is a discrete action, so it must fire once per step-on, not once per
+	-- limb per contact. A character lands on a plate with both legs (and re-touches
+	-- as it settles), which is why "Buy 1 Toilet" was buying two. Count how many of
+	-- the player's parts are in contact and only act on the 0 -> 1 transition.
+	local contacts: { [Player]: number } = {}
+	occupancy[plate] = contacts
+
 	plate.Touched:Connect(function(hit)
 		local player = playerFromPart(hit)
 		if not player then return end
+		local n = contacts[player] or 0
+		contacts[player] = n + 1
+		if n > 0 then return end -- already standing on it
+
 		-- pads only work on your own plot
 		local plot = PlotService.plotOfInstance(padModel)
 		if plot and PlotService.plotFor(player) ~= plot then return end
@@ -341,6 +356,13 @@ local function bindPlate(plate: BasePart)
 		if handler then
 			task.spawn(handler, player, padModel)
 		end
+	end)
+
+	plate.TouchEnded:Connect(function(hit)
+		local player = playerFromPart(hit)
+		if not player then return end
+		local n = (contacts[player] or 0) - 1
+		contacts[player] = n > 0 and n or nil
 	end)
 end
 
@@ -416,7 +438,33 @@ function PadService.init()
 
 	task.spawn(PadService.runSellZone)
 
-	Players.PlayerRemoving:Connect(function(player) lastTouch[player] = nil end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastTouch[player] = nil
+		for _, contacts in pairs(occupancy) do contacts[player] = nil end
+	end)
+
+	-- A dropped TouchEnded (respawn, ragdoll, teleport off the pad) would otherwise
+	-- leave the count above zero and the pad dead for the rest of the session, so
+	-- clear anyone who is demonstrably no longer standing on the plate.
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			for plate, contacts in pairs(occupancy) do
+				if not plate.Parent then
+					occupancy[plate] = nil
+					continue
+				end
+				local reach = plate.Size.Magnitude * 0.5 + 10
+				for player in pairs(contacts) do
+					local char = player.Character
+					local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+					if not hrp or (hrp.Position - plate.Position).Magnitude > reach then
+						contacts[player] = nil
+					end
+				end
+			end
+		end
+	end)
 
 	-- keep every label on the owner's plot current, including the "Selling Poop…" sign
 	task.spawn(function()
