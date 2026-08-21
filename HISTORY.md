@@ -45,8 +45,18 @@ complaints about UI scaling on an ultrawide monitor.
   their nearest edge (or centre), and the HUD container is widened to `viewport/scale`
   in design space so one uniform scale still renders as exactly the viewport.
   Panels deliberately keep the centred design frame.
-- **Flush Meter rebuilt as a top-centre banner** (partner request, with a reference
-  screenshot of the "Egg Multiplier" bar from the game they are benchmarking against).
+- **Flush Multiplier moved out of the HUD entirely and into the world.** It is a
+  server-wide number, so it now hangs as a hologram over the leaderboard cluster in
+  the middle of the hub — measured at the centroid of the three Leaderboard models,
+  10.8 studs above their tops, with a gentle bob. Built per client rather than
+  replicated: it is pure decoration, and the countdown can tick smoothly off the
+  FlushMeter payload the client already receives instead of the server pushing a new
+  string ten times a second. The screen-space version was deleted.
+- **Edge padding.** Pinned HUD children were sitting flush against the glass (0-1px),
+  which read as the HUD falling off the screen. `pinEdges` now clamps every pinned
+  gap to a 28px design-space margin — measured at ~30px on a 3100px viewport.
+- The step before that had rebuilt the meter as a top-centre screen banner (partner
+  request, referencing the "Egg Multiplier" bar from the game they benchmark against).
   It was a dark 300x96 box in the top-right at offset x=1892 — outside the 1876-wide
   design frame. It is now a headline (`Flush Multiplier: 1.5x`, coloured by roll
   quality) over a gradient countdown pill reading `Updating in Ns`, dead centre at the

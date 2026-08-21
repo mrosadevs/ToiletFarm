@@ -266,4 +266,184 @@ function WorldFx.bindFootsteps()
 	player.CharacterAdded:Connect(attach)
 end
 
+-- ── Flush Multiplier hologram ───────────────────────────────────────────────
+-- The multiplier is server-wide, so it belongs in the shared space rather than on
+-- one player's screen: a hologram floating over the leaderboards in the middle of
+-- the hub, where everyone is looking at the same number.
+--
+-- Built per client rather than replicated from the server. It is pure decoration,
+-- and the countdown can then tick smoothly off the FlushMeter payload the client
+-- already receives, instead of the server pushing a new string ten times a second.
+
+local Config = require(ReplicatedStorage:WaitForChild("Shared").ToiletConfig)
+local Net = require(ReplicatedStorage:WaitForChild("Shared").Net)
+
+local function hologramAnchor(): CFrame
+	local hub = workspace:FindFirstChild("Hub")
+	-- centre it on the leaderboard cluster and float it clear of their tops
+	if hub then
+		local sum, count, highest = Vector3.zero, 0, -math.huge
+		for _, m in ipairs(hub:GetChildren()) do
+			if m:IsA("Model") and m.Name:match("^Leaderboard") then
+				local cf, size = m:GetBoundingBox()
+				sum += cf.Position
+				highest = math.max(highest, cf.Position.Y + size.Y * 0.5)
+				count += 1
+			end
+		end
+		if count > 0 then
+			local centre = sum / count
+			return CFrame.new(centre.X, highest + 11, centre.Z)
+		end
+	end
+	local centre = workspace:FindFirstChild("Center")
+	if centre and centre:IsA("Model") then
+		local cf, size = centre:GetBoundingBox()
+		return CFrame.new(cf.Position.X, cf.Position.Y + size.Y * 0.5 + 32, cf.Position.Z)
+	end
+	return CFrame.new(0, 48, 0)
+end
+
+local function meterColour(mult: number): Color3
+	if mult >= 2 then return Color3.fromRGB(255, 215, 60) end
+	if mult >= 1.5 then return Color3.fromRGB(120, 255, 140) end
+	if mult >= 1.25 then return Color3.fromRGB(150, 230, 255) end
+	if mult >= 1 then return Color3.fromRGB(235, 235, 240) end
+	return Color3.fromRGB(255, 120, 120)
+end
+
+function WorldFx.buildFlushHologram()
+	local anchor = Instance.new("Part")
+	anchor.Name = "FlushHologramAnchor"
+	anchor.Size = Vector3.new(1, 1, 1)
+	anchor.Transparency = 1
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.CastShadow = false
+	anchor.CFrame = hologramAnchor()
+	anchor.Parent = workspace
+
+	local board = Instance.new("BillboardGui")
+	board.Name = "FlushHologram"
+	board.Size = UDim2.fromOffset(760, 250)
+	board.StudsOffsetWorldSpace = Vector3.new(0, 0, 0)
+	-- big enough to read from anywhere in the hub, and it should never punch through
+	-- the world from another island
+	board.MaxDistance = 400
+	board.LightInfluence = 0
+	board.AlwaysOnTop = false
+	board.Parent = anchor
+
+	local panel = Instance.new("Frame")
+	panel.Size = UDim2.fromScale(1, 1)
+	panel.BackgroundColor3 = Color3.fromRGB(20, 40, 70)
+	panel.BackgroundTransparency = 0.35
+	panel.BorderSizePixel = 0
+	local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0, 26); pc.Parent = panel
+	local ps = Instance.new("UIStroke")
+	ps.Thickness = 4
+	ps.Color = Color3.fromRGB(120, 230, 255)
+	ps.Transparency = 0.15
+	ps.Parent = panel
+	panel.Parent = board
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -40, 0, 58)
+	title.Position = UDim2.fromOffset(20, 16)
+	title.BackgroundTransparency = 1
+	title.Font = Enum.Font.FredokaOne
+	title.TextScaled = true
+	title.TextColor3 = Color3.fromRGB(170, 235, 255)
+	title.Text = "FLUSH MULTIPLIER"
+	local tls = Instance.new("UIStroke"); tls.Thickness = 3; tls.Color = Color3.new(0, 0, 0); tls.Parent = title
+	title.Parent = panel
+
+	local value = Instance.new("TextLabel")
+	value.Name = "Value"
+	value.Size = UDim2.new(1, -40, 0, 96)
+	value.Position = UDim2.fromOffset(20, 70)
+	value.BackgroundTransparency = 1
+	value.Font = Enum.Font.FredokaOne
+	value.TextScaled = true
+	value.TextColor3 = Color3.fromRGB(255, 235, 140)
+	value.Text = "1x"
+	local vls = Instance.new("UIStroke"); vls.Thickness = 5; vls.Color = Color3.new(0, 0, 0); vls.Parent = value
+	value.Parent = panel
+
+	local track = Instance.new("Frame")
+	track.AnchorPoint = Vector2.new(0.5, 0)
+	track.Position = UDim2.new(0.5, 0, 0, 174)
+	track.Size = UDim2.fromOffset(600, 48)
+	track.BackgroundColor3 = Color3.fromRGB(16, 24, 38)
+	track.BorderSizePixel = 0
+	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(1, 0); tc.Parent = track
+	local ts = Instance.new("UIStroke"); ts.Thickness = 3; ts.Color = Color3.new(0, 0, 0); ts.Parent = track
+	track.Parent = panel
+
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = Color3.new(1, 1, 1)
+	fill.BorderSizePixel = 0
+	local fc = Instance.new("UICorner"); fc.CornerRadius = UDim.new(1, 0); fc.Parent = fill
+	local grad = Instance.new("UIGradient")
+	grad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0.0, Color3.fromRGB(235, 70, 60)),
+		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(245, 165, 50)),
+		ColorSequenceKeypoint.new(0.7, Color3.fromRGB(245, 225, 70)),
+		ColorSequenceKeypoint.new(1.0, Color3.fromRGB(85, 220, 90)),
+	})
+	grad.Parent = fill
+	fill.Parent = track
+
+	local timer = Instance.new("TextLabel")
+	timer.Name = "Timer"
+	timer.Size = UDim2.fromScale(1, 1)
+	timer.BackgroundTransparency = 1
+	timer.Font = Enum.Font.FredokaOne
+	timer.TextScaled = true
+	timer.TextColor3 = Color3.new(1, 1, 1)
+	timer.Text = ""
+	timer.ZIndex = 3
+	local tp = Instance.new("UIPadding")
+	tp.PaddingTop = UDim.new(0, 9); tp.PaddingBottom = UDim.new(0, 9)
+	tp.Parent = timer
+	local tms = Instance.new("UIStroke"); tms.Thickness = 3; tms.Color = Color3.new(0, 0, 0); tms.Parent = timer
+	timer.Parent = track
+
+	local state = { mult = 1, nextRollAt = 0, period = Config.FLUSH_METER.period }
+	Net.event(Net.NAMES.FlushMeter).OnClientEvent:Connect(function(payload)
+		state = payload
+		value.Text = ("%sx"):format(payload.mult)
+		value.TextColor3 = meterColour(payload.mult)
+		ps.Color = meterColour(payload.mult)
+	end)
+
+	-- gentle bob, so it reads as a hologram rather than a decal in the sky
+	local baseY = anchor.Position.Y
+	task.spawn(function()
+		while anchor.Parent do
+			task.wait(0.1)
+			local period = state.period or Config.FLUSH_METER.period
+			local left = state.nextRollAt - workspace:GetServerTimeNow()
+			if left > 0 then
+				timer.Text = ("Updating in %ds"):format(math.ceil(left))
+				fill.Size = UDim2.fromScale(math.clamp((period - left) / period, 0, 1), 1)
+			else
+				timer.Text = "Updating..."
+				fill.Size = UDim2.fromScale(1, 1)
+			end
+			anchor.CFrame = CFrame.new(
+				anchor.Position.X,
+				baseY + math.sin(workspace:GetServerTimeNow() * 1.1) * 0.7,
+				anchor.Position.Z
+			)
+		end
+	end)
+
+	return anchor
+end
+
 return WorldFx

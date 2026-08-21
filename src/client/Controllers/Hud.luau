@@ -78,94 +78,6 @@ local function refreshPacks(cash: number)
 	end
 end
 
--- ── Flush Meter readout ─────────────────────────────────────────────────
--- The multiplier is SERVER-WIDE (see FlushMeterService), so it is banner furniture,
--- not a personal stat: headline across the top middle of the screen with a countdown
--- bar under it, where every player in the server is looking at the same number.
-local meterFrame: Frame
-local meterValue: TextLabel
-local meterTimer: TextLabel
-local meterFill: Frame
-local meterState = { mult = 1, nextRollAt = 0, period = 30 }
-
-local function buildFlushMeter()
-	local f = Instance.new("Frame")
-	f.Name = "FlushMeter"
-	f.AnchorPoint = Vector2.new(0.5, 0)
-	f.Position = UDim2.new(0.5, 0, 0, 104)
-	f.Size = UDim2.fromOffset(620, 104)
-	f.BackgroundTransparency = 1
-	f.BorderSizePixel = 0
-
-	-- one bold line, no box behind it: the world reads through it like the reference
-	meterValue = Instance.new("TextLabel")
-	meterValue.Name = "MeterHeadline"
-	meterValue.Size = UDim2.new(1, 0, 0, 54)
-	meterValue.BackgroundTransparency = 1
-	meterValue.Font = Enum.Font.FredokaOne
-	meterValue.TextScaled = true
-	meterValue.TextColor3 = Color3.fromRGB(255, 235, 140)
-	meterValue.Text = "Flush Multiplier: 1x"
-	local vs = Instance.new("UIStroke")
-	vs.Thickness = 4; vs.Color = Color3.new(0, 0, 0); vs.Parent = meterValue
-	meterValue.Parent = f
-
-	local track = Instance.new("Frame")
-	track.Name = "MeterTrack"
-	track.AnchorPoint = Vector2.new(0.5, 0)
-	track.Position = UDim2.new(0.5, 0, 0, 60)
-	track.Size = UDim2.fromOffset(470, 40)
-	track.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
-	track.BorderSizePixel = 0
-	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(1, 0); tc.Parent = track
-	local tstroke = Instance.new("UIStroke")
-	tstroke.Thickness = 3; tstroke.Color = Color3.new(0, 0, 0); tstroke.Parent = track
-	track.Parent = f
-
-	meterFill = Instance.new("Frame")
-	meterFill.Name = "MeterFill"
-	meterFill.Size = UDim2.fromScale(0, 1)
-	meterFill.BackgroundColor3 = Color3.new(1, 1, 1)
-	meterFill.BorderSizePixel = 0
-	local fc = Instance.new("UICorner"); fc.CornerRadius = UDim.new(1, 0); fc.Parent = meterFill
-	local grad = Instance.new("UIGradient")
-	grad.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0.0, Color3.fromRGB(235, 70, 60)),
-		ColorSequenceKeypoint.new(0.4, Color3.fromRGB(245, 165, 50)),
-		ColorSequenceKeypoint.new(0.7, Color3.fromRGB(245, 225, 70)),
-		ColorSequenceKeypoint.new(1.0, Color3.fromRGB(85, 220, 90)),
-	})
-	grad.Parent = meterFill
-	meterFill.Parent = track
-
-	meterTimer = Instance.new("TextLabel")
-	meterTimer.Name = "MeterTimer"
-	meterTimer.Size = UDim2.fromScale(1, 1)
-	meterTimer.BackgroundTransparency = 1
-	meterTimer.Font = Enum.Font.FredokaOne
-	meterTimer.TextScaled = true
-	meterTimer.TextColor3 = Color3.new(1, 1, 1)
-	meterTimer.Text = ""
-	meterTimer.ZIndex = 3
-	local tp = Instance.new("UIPadding")
-	tp.PaddingTop = UDim.new(0, 7); tp.PaddingBottom = UDim.new(0, 7)
-	tp.Parent = meterTimer
-	local ms = Instance.new("UIStroke")
-	ms.Thickness = 3; ms.Color = Color3.new(0, 0, 0); ms.Parent = meterTimer
-	meterTimer.Parent = track
-
-	f.Parent = C
-	meterFrame = f
-end
-
-local function meterColor(mult: number): Color3
-	if mult >= 2 then return Color3.fromRGB(255, 215, 60) end
-	if mult >= 1.5 then return Color3.fromRGB(120, 255, 140) end
-	if mult >= 1.25 then return Color3.fromRGB(150, 230, 255) end
-	if mult >= 1 then return Color3.fromRGB(235, 235, 240) end
-	return Color3.fromRGB(255, 120, 120)
-end
-
 -- ── refresh ────────────────────────────────────────────────────────────
 local function refresh(data: any, changed: any)
 	local cashLabel = find("CashAmount") :: TextLabel?
@@ -254,7 +166,10 @@ function Hud.init()
 	C = screen:WaitForChild("Container") :: Frame
 
 	collectPacks()
-	buildFlushMeter()
+
+	-- The Flush Multiplier is NOT on this screen. It is server-wide, so it lives as a
+	-- hologram over the hub leaderboards where everyone reads the same number --
+	-- see WorldFx.buildFlushHologram.
 
 	-- the token row is authored 71px wide and clipping, which fits "11" and nothing
 	-- else; let it grow now that the label names its unit
@@ -315,33 +230,6 @@ function Hud.init()
 	State.onChanged(refresh)
 	refresh(State.data, {})
 
-	-- Flush Meter feed
-	Net.event(Net.NAMES.FlushMeter).OnClientEvent:Connect(function(payload)
-		meterState = payload
-		meterValue.Text = ("Flush Multiplier: %sx"):format(payload.mult)
-		meterValue.TextColor3 = meterColor(payload.mult)
-		UIKit.pop(meterFrame, 1.12)
-	end)
-
-	-- countdown to the next roll, so players can sprint to bank a good one
-	task.spawn(function()
-		while true do
-			task.wait(0.1)
-			if meterTimer and meterState.nextRollAt then
-				local period = meterState.period or Config.FLUSH_METER.period
-				local left = meterState.nextRollAt - workspace:GetServerTimeNow()
-				if left > 0 then
-					meterTimer.Text = ("Updating in %ds"):format(math.ceil(left))
-					-- the bar fills toward the re-roll rather than draining, so a full
-					-- bar reads as "about to change" at a glance
-					meterFill.Size = UDim2.fromScale(math.clamp((period - left) / period, 0, 1), 1)
-				else
-					meterTimer.Text = "Updating..."
-					meterFill.Size = UDim2.fromScale(1, 1)
-				end
-			end
-		end
-	end)
 end
 
 return Hud

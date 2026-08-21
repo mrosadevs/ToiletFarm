@@ -24,6 +24,9 @@ function UIKit.pinEdges(container: GuiObject, design: Vector2)
 
 	-- anything whose centre lands within this much of the middle stays centred
 	local CENTRE_BAND = 0.10
+	-- Breathing room in design pixels. Pinned children would otherwise sit flush
+	-- against the glass, which looks like the HUD is falling off the screen.
+	local MARGIN = 28
 
 	-- Resolve a UDim against the design span. The Figma export leaves floating-point
 	-- noise in the scale terms (a child at x=1748 carries scale=-0.000154), so these
@@ -48,10 +51,12 @@ function UIKit.pinEdges(container: GuiObject, design: Vector2)
 				if math.abs(centre - middle) < span * CENTRE_BAND then
 					return 0.5, UDim.new(0.5, centre - middle)
 				elseif centre > middle then
-					-- far edge: position now refers to the child's far edge
-					return 1, UDim.new(1, -(span - (offset + extent)))
+					-- far edge: position now refers to the child's far edge, and the gap
+					-- to that edge never closes below the margin
+					local gap = math.max(span - (offset + extent), MARGIN)
+					return 1, UDim.new(1, -gap)
 				end
-				return 0, UDim.new(0, offset)
+				return 0, UDim.new(0, math.max(offset, MARGIN))
 			end
 
 			local ax, px = axis(left, w, design.X)
