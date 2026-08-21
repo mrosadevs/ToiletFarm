@@ -99,6 +99,20 @@ through and everything below was then playtested in Studio.
   session 2; nothing needed implementing, only proving.
 - **Magnetise speed** measured at 216ms from collect to reaching the player after
   the second pass (Responsiveness 85, MaxVelocity 600).
+- **Pad colouring moved to the button.** The first pass painted `Plate` -- the brown
+  wooden base every pad shares -- which turned the whole pad into a slab of colour.
+  `Part` is the button on top. Every button also has its own authored colour (Buy
+  green, Merge yellow, Upgrade purple, the Robux pads gold), so there is no single
+  "ready" shade: the original is stashed on the part on first sight and restored
+  from there. Verified on a live farm -- all plates still 107,79,60, buttons showing
+  their own colours, red on Upgrade/Processing, grey on Merge and the cooling group
+  pad. `1600a74`
+- **Toilet prices now have a balance floor** (`7ab4ca1`). The farm-size curve alone
+  charged $2.2k a toilet while the player sat on $32M. A full 100 batch now costs a
+  quarter of the balance, smaller pads proportionally less; it is a max() with the
+  curve, so a player behind the curve still pays the curve and the early game is
+  untouched. Measured at $32.6M: $81,504 / $408K / $2.04M / $8.15M for 1 / 5 / 25 /
+  100, and the quote charged matches the quote displayed.
 - Console clean across four play sessions -- no warnings, no errors. Cash, toilets
   and rebirth count survived all four restarts.
 - `ToiletService.pendingMerges` also run against 9 synthetic cases: cascades correct,
