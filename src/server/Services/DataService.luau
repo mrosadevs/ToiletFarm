@@ -241,7 +241,9 @@ function DataService.poopItemRate(player: Player): number
 	local speed = 1 - 0.03 * (p.upgrades.FlushSpeed or 0)
 	local total = 0
 	for _, t in ipairs(p.toilets) do
-		total += 1 / (Config.dropInterval(t.tier) * speed)
+		-- weighted by what each drop COUNTS as, so a night offline on Tier 8 toilets
+		-- banks the same basket figure as standing there collecting them
+		total += Config.poopCount(t.tier) / (Config.dropInterval(t.tier) * speed)
 	end
 	return total
 end

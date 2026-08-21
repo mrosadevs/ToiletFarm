@@ -537,6 +537,9 @@ function PoopService.drop(plot: Model, origin: Vector3, tier: number, mut: strin
 	local p = templateFor(tier, mut):Clone()
 	p.Name = "Poop"
 	p:SetAttribute("Value", value)
+	-- what it counts as in the basket, which is not the same thing as what it is
+	-- worth: see Config.poopCount
+	p:SetAttribute("Count", Config.poopCount(tier))
 	p:SetAttribute("Tier", tier)
 	p:SetAttribute("Mutation", mut)
 	p:SetAttribute("Born", os.clock())
@@ -607,24 +610,28 @@ function PoopService.collect(player: Player, poops: { BasePart }, animate: boole
 	local profile = DataService.get(player)
 	if not profile or #poops == 0 then return end
 
-	local gained, taken = 0, {}
+	local gained, counted, taken = 0, 0, {}
 	for _, p in ipairs(poops) do
 		-- already flying into someone; do not pay for it twice
 		if not p:GetAttribute("Collected") then
 			local v = p:GetAttribute("Value") or 0
+			-- Count is written at drop time from the toilet's tier. Older poops already
+			-- lying on a farm when this shipped have no attribute, so they count as one.
+			local n = p:GetAttribute("Count") or 1
 			gained += v
-			table.insert(taken, { part = p, value = v })
+			counted += n
+			table.insert(taken, { part = p, value = v, count = n })
 		end
 	end
 	if #taken == 0 then return end
 
 	profile.poops += gained
-	profile.poopItems += #taken
+	profile.poopItems += counted
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local payload = table.create(#taken)
 	for _, e in ipairs(taken) do
-		table.insert(payload, { pos = e.part.Position, value = e.value })
+		table.insert(payload, { pos = e.part.Position, value = e.value, count = e.count })
 		if animate and hrp then
 			flyIntoPlayer(e.part, hrp)
 		else
@@ -636,7 +643,7 @@ function PoopService.collect(player: Player, poops: { BasePart }, animate: boole
 
 	-- advances the "Collect N Poops" tutorial step
 	local TutorialService = require(script.Parent.TutorialService)
-	TutorialService.notify(player, "collect", #taken)
+	TutorialService.notify(player, "collect", counted)
 end
 
 -- "Arrived" means it has reached the collection area and settled, which is what

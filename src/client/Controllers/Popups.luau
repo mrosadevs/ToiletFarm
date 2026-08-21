@@ -81,10 +81,11 @@ end
 function Popups.poopBurst(entries: { any })
 	task.spawn(function()
 		for i, e in ipairs(entries) do
-			-- One poop is +1. This used to print the poop's cash VALUE, so picking up a
-			-- single poop worth 19 flashed "+19" while the basket went up by one.
-			-- The value still decides whether it gets the big gold treatment.
-			Popups.poopGain(1, e.value >= 1000)
+			-- Exactly what the basket gained: a Tier 8 dropping is +8, a Tier 1 is +1.
+			-- This used to print the poop's cash VALUE, so a single poop worth 19 flashed
+			-- "+19" while the basket moved by one. The value still decides whether it gets
+			-- the big gold treatment.
+			Popups.poopGain(e.count or 1, e.value >= 1000)
 			Audio.playVaried("PoopPlop", 0.15)
 			if i % 3 == 0 then task.wait(0.05) end
 		end

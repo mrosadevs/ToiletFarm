@@ -104,6 +104,16 @@ function Config.poopValue(tier: number): number
 	return Config.incomePerSecond(tier) * Config.dropInterval(tier)
 end
 
+-- How many POOPS one dropping counts as, as opposed to what it is worth. A Tier 8
+-- toilet producing a single item the basket counts as "1" reads as though the tier
+-- did nothing, because the basket is the number the player watches while carrying.
+-- The tier is the count, so a T8 drop is 8 poops and a T30 drop is 30 -- generous
+-- enough to feel earned, and nothing like the value curve (3.6^tier), which would
+-- make the basket meaningless within a few tiers.
+function Config.poopCount(tier: number): number
+	return math.max(1, math.floor(tier))
+end
+
 function Config.rarityOf(tier: number): string
 	if tier <= 5 then return "Common"
 	elseif tier <= 10 then return "Uncommon"
