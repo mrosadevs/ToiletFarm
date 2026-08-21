@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.ToiletConfig)
@@ -512,6 +513,12 @@ local function dropPointFor(plot: Model, origin: Vector3): Vector3
 	return pcf:PointToWorldSpace(Vector3.new(localOrigin.X, cached.y, cached.z))
 end
 
+-- Where a poop enters the world for a toilet standing at `origin`. Exposed so a
+-- lucky block can arrive at the same place instead of inside the stall.
+function PoopService.dropPoint(plot: Model, origin: Vector3): Vector3
+	return dropPointFor(plot, origin)
+end
+
 function PoopService.drop(plot: Model, origin: Vector3, tier: number, mut: string, value: number)
 	local bin = plot:FindFirstChild("WorldPoops")
 	if not bin then return end
@@ -553,32 +560,42 @@ end
 -- from overwriting the CFrame mid-flight.
 local function flyIntoPlayer(part: BasePart, hrp: BasePart)
 	part:SetAttribute("Collected", true)
-	-- resting poops are free bodies now, so take manual control back before animating
-	part.Anchored = true
+	part.Anchored = false
 	part.CanCollide = false
 	part.CanTouch = false
 	part.CanQuery = false
-	task.spawn(function()
-		local from = part.Position
-		local spin = part.CFrame - part.Position
-		-- a little kick upward first, then home in
-		local t0 = os.clock()
-		local DUR = 0.26 + math.random() * 0.1
-		while part.Parent do
-			local a = (os.clock() - t0) / DUR
-			if a >= 1 then break end
-			if not hrp.Parent then break end
-			local target = hrp.Position
-			-- ease-in so it accelerates into the body
-			local pos = from:Lerp(target, a * a)
-			pos += Vector3.new(0, math.sin(a * math.pi) * 1.6, 0)
-			part.CFrame = CFrame.new(pos) * spin * CFrame.Angles(a * 8, a * 6, 0)
-			-- shrink as it is absorbed
-			part.Size = part.Size * 0.965
-			task.wait()
-		end
-		part:Destroy()
-	end)
+
+	-- The flight is a constraint, not a CFrame written every frame. An ANCHORED
+	-- part's CFrame replicates at about 20Hz and the receiving client does not
+	-- interpolate it, which is what made the magnetise stutter; a physics body is
+	-- interpolated. Handing the collector network ownership goes further and
+	-- simulates the whole flight on their own machine at their own frame rate.
+	local from = Instance.new("Attachment")
+	from.Parent = part
+	local to = Instance.new("Attachment")
+	to.Name = "PoopMagnet"
+	to.Position = Vector3.new(0, 0.6, 0)
+	to.Parent = hrp
+
+	-- a kick upward so it arcs into the body rather than skating along the floor
+	part.AssemblyLinearVelocity = Vector3.new(0, 16, 0)
+	part.AssemblyAngularVelocity = Vector3.new(
+		(math.random() - 0.5) * 10, (math.random() - 0.5) * 10, (math.random() - 0.5) * 10)
+
+	local align = Instance.new("AlignPosition")
+	align.Attachment0 = from
+	align.Attachment1 = to
+	align.ApplyAtCenterOfMass = true
+	align.MaxForce = 120000     -- a poop weighs well under a stud-cube; this is ample
+	align.MaxVelocity = 150
+	align.Responsiveness = 22   -- fast, but with enough give to read as a swoop
+	align.Parent = part
+
+	local owner = Players:GetPlayerFromCharacter(hrp.Parent)
+	if owner then pcall(function() part:SetNetworkOwner(owner) end) end
+
+	Debris:AddItem(to, 0.7)
+	Debris:AddItem(part, 0.7)
 end
 
 -- ── pickup ────────────────────────────────────────────────────────────────
@@ -649,7 +666,38 @@ local function hasArrived(plot: Model, poop: BasePart): boolean
 	return true
 end
 
+-- Every farm is ringed by invisible slabs under Plot*.Border. They are there to
+-- stop poops rolling off the island, but they shipped as plain Default parts with
+-- CanCollide off, so they did nothing at all. PoopWall is already registered to
+-- collide with Poop and nothing else, so a player still walks straight through one.
+--
+-- The group is assigned FIRST and collision only enabled if that succeeded: a
+-- barrier left in Default with CanCollide on would wall the player in.
+local function armPoopBarriers(): number
+	local plots = workspace:FindFirstChild("Plots")
+	if not plots then return 0 end
+	local armed = 0
+	for _, plot in ipairs(plots:GetChildren()) do
+		local border = plot:FindFirstChild("Border")
+		if not border then continue end
+		for _, part in ipairs(border:GetDescendants()) do
+			if part:IsA("BasePart") and pcall(function() part.CollisionGroup = "PoopWall" end) then
+				part.Anchored = true
+				part.CanCollide = true
+				part.CanQuery = false
+				armed += 1
+			end
+		end
+	end
+	return armed
+end
+
 function PoopService.init()
+	local armed = armPoopBarriers()
+	if armed == 0 then
+		warn("[PoopService] no Border barriers found -- poops can roll off the farms")
+	end
+
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
 		acc += dt
