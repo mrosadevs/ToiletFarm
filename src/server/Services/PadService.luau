@@ -68,6 +68,25 @@ local function labels(pad: Model): (TextLabel?, TextLabel?, TextLabel?)
 	return quantity, price, sub
 end
 
+-- Plate colours. A pad has to read as one of three things from across the farm:
+--   ready     walk on it and it does something
+--   denied    the action is live but you cannot pay for it yet
+--   inactive  nothing to do here at all -- maxed out, locked behind a rebirth,
+--             or, on the Merge pad, nothing to act on
+-- Unaffordable used to share the grey with maxed-out, so a pad you had simply
+-- outgrown and one you were two dollars short of looked identical.
+local PLATE = {
+	ready    = Color3.fromRGB(107,  79,  60),
+	denied   = Color3.fromRGB(178,  52,  52),
+	inactive = Color3.fromRGB(110, 110, 118),
+}
+
+local function paint(pad: Model, colour: Color3)
+	local plate = pad:FindFirstChild("Plate") :: BasePart?
+	-- guarded: this runs 4x a second per pad, and an unchanged write still replicates
+	if plate and plate.Color ~= colour then plate.Color = colour end
+end
+
 -- pads that sell a gamepass or dev product, and which one
 local ROBUX_PADS = {
 	AutoPoopPad  = { kind = "pass",    id = "AutoFlush",        label = "Auto Collect Poops" },
@@ -92,12 +111,8 @@ local function refreshPad(pad: Model, player: Player)
 		if price then price.Text = "$" .. Format.cash(unit * amount) end
 		pad:SetAttribute("PreviewTier", tier)
 
-		-- color plate grey if unaffordable
-		local plate = pad:FindFirstChild("Plate") :: BasePart?
-		if plate then
-			local can_afford = tier ~= nil and p.cash >= (unit * amount)
-			plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
-		end
+		-- this pad always has something to sell, so the only failure is the price
+		paint(pad, (tier ~= nil and p.cash >= unit * amount) and PLATE.ready or PLATE.denied)
 	elseif kind == "CollectCashPad" then
 		if quantity then quantity.Text = "Collect Cash" end
 		if price then price.Text = "$" .. Format.cash(EconomyService.pendingCash(player)) end
@@ -113,10 +128,10 @@ local function refreshPad(pad: Model, player: Player)
 		local cost = Config.processCost(level)
 		if price then price.Text = cost and ("$" .. Format.cash(cost)) or "MAX" end
 
-		local plate = pad:FindFirstChild("Plate") :: BasePart?
-		if plate then
-			local can_afford = cost ~= nil and p.cash >= cost
-			plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
+		if cost == nil then
+			paint(pad, PLATE.inactive) -- fully upgraded, not too expensive
+		else
+			paint(pad, p.cash >= cost and PLATE.ready or PLATE.denied)
 		end
 
 	elseif kind == "DepositPad" then
@@ -128,19 +143,18 @@ local function refreshPad(pad: Model, player: Player)
 		if quantity then quantity.Text = cost and ("Rebirth %d"):format(p.rebirths + 1) or "MAX REBIRTH" end
 		if price then price.Text = cost and ("$" .. Format.cash(cost)) or "" end
 
-		local plate = pad:FindFirstChild("Plate") :: BasePart?
-		if plate then
-			local can_afford = cost ~= nil and p.cash >= cost
-			plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
+		if cost == nil then
+			paint(pad, PLATE.inactive) -- MAX REBIRTH
+		else
+			paint(pad, p.cash >= cost and PLATE.ready or PLATE.denied)
 		end
 	elseif kind == "UpgradeBuyTierPad" then
 		local tier = p.buyTier or 1
 		local ceiling = Config.maxBuyTier(p.rebirths)
-		local plate = pad:FindFirstChild("Plate") :: BasePart?
 		if tier >= ceiling then
 			if quantity then quantity.Text = "Upgrade Buy Tier" end
 			if price then price.Text = ("[REQ: Rebirth %d]"):format(p.rebirths + 1) end
-			if plate then plate.Color = Color3.fromRGB(110, 110, 118) end
+			paint(pad, PLATE.inactive) -- no amount of cash opens this until you rebirth
 		else
 			if quantity then
 				quantity.Text = ("Upgrade Buy Tier\n%s > %s")
@@ -148,19 +162,22 @@ local function refreshPad(pad: Model, player: Player)
 			end
 			local need = Config.buyTierRequirement(tier)
 			local owned = ToiletService.totalToilets(player)
-			local can_afford = owned >= need
+			local cost = Config.buyTierCost(tier)
+			local hasToilets = owned >= need
 			if price then
-				price.Text = can_afford
-					and ("$" .. Format.cash(Config.buyTierCost(tier)))
+				price.Text = hasToilets
+					and ("$" .. Format.cash(cost))
 					or ("%s / %s Toilets"):format(Format.short(owned), Format.short(need))
 			end
-			if plate then
-				plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
-			end
+			-- it costs toilets AND cash, and either shortfall is "you cannot buy this yet"
+			paint(pad, (hasToilets and p.cash >= cost) and PLATE.ready or PLATE.denied)
 		end
 	elseif kind == "MergePad" then
 		if quantity then quantity.Text = "Merge All" end
 		if price then price.Text = "" end
+		-- Grey with nothing to merge. Stepping on it in that state can only ever
+		-- produce the "you need 3 of a kind" toast, so say so before the player walks.
+		paint(pad, ToiletService.pendingMerges(player) > 0 and PLATE.ready or PLATE.inactive)
 	elseif kind == "FreeMoneyPad" then
 		-- no hologram: this pad has its own FreeMoneySign board, and the billboard
 		-- floated high above the septic area where it read as a stray label

@@ -253,6 +253,34 @@ local function mergeOnce(player: Player): (number, number?)
 	return merges, highest
 end
 
+-- How many merges "Merge All" would perform right now, cascades included. The
+-- Merge pad greys itself out on a zero, so this has to mirror mergeOnce's
+-- eligibility exactly: anything below MAX_TIER counts, mutated or not.
+function ToiletService.pendingMerges(player: Player): number
+	local p = DataService.get(player)
+	if not p then return 0 end
+
+	local count: { [number]: number } = {}
+	for _, t in ipairs(p.toilets) do
+		local tier = t.tier or 1
+		if tier < Config.MAX_TIER then count[tier] = (count[tier] or 0) + 1 end
+	end
+
+	local total = 0
+	for tier = 1, Config.MAX_TIER - 1 do
+		local made = math.floor((count[tier] or 0) / Config.MERGE_COUNT)
+		if made > 0 then
+			total += made
+			-- the results are themselves mergeable, which is why one step on the pad
+			-- can cascade several tiers up
+			if tier + 1 < Config.MAX_TIER then
+				count[tier + 1] = (count[tier + 1] or 0) + made
+			end
+		end
+	end
+	return total
+end
+
 -- "Merge All" — keeps going until nothing else can merge
 function ToiletService.mergeAll(player: Player)
 	local total, highest = 0, nil

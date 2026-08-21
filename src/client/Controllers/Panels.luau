@@ -296,10 +296,17 @@ local function refreshRebirth()
 
 	local btn = panel:FindFirstChild("RebirthButton") :: Frame?
 	if btn then
-		local can = cost ~= nil and d.cash >= cost
 		local face = btn:FindFirstChild("Face") :: Frame?
 		if face then
-			face.BackgroundColor3 = can and Color3.fromRGB(60, 230, 60) or Color3.fromRGB(110, 110, 118)
+			-- matches the world pads: green you can buy it, red you cannot pay for it,
+			-- grey there is nothing left to buy
+			if cost == nil then
+				face.BackgroundColor3 = Color3.fromRGB(110, 110, 118)
+			elseif d.cash >= cost then
+				face.BackgroundColor3 = Color3.fromRGB(60, 230, 60)
+			else
+				face.BackgroundColor3 = Color3.fromRGB(178, 52, 52)
+			end
 		end
 	end
 end
