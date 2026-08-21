@@ -22,6 +22,8 @@ local Screens = require(script.Parent.Screens)
 local PRODUCT_IDS = { 3708565222, 3708565345, 3708565384 }
 -- must match PassService.PASSES.DoubleCash
 local PASS_DOUBLE_CASH = 1948365646
+-- must match the "if hasPass DoubleCash then m *= 2" in DataService.cashMultiplier
+local DOUBLE_CASH_MULT = 2
 
 local player = Players.LocalPlayer
 local gui = player:WaitForChild("PlayerGui")
@@ -194,11 +196,19 @@ local function refresh(data: any, changed: any)
 	local robux = find("RobuxAmount") :: TextLabel?
 	if robux then robux.Text = tostring(data.tokens or 0) end
 
+	-- the small line by the cash bar: what you actually earn right now
 	local multText = find("CashMultiplierText") :: TextLabel?
 	if multText then multText.Text = ("x%s Cash"):format(Format.short(data.multiplier or 1)) end
 
+	-- The green PERMANENT badge is a storefront for the x2 Cash gamepass, so it has
+	-- to advertise what you would GET. Writing the player's current multiplier here
+	-- made it read "1x Cash" — a button selling you nothing.
 	local badge = find("MultiplierLabel") :: TextLabel?
-	if badge then badge.Text = ("%sx Cash"):format(Format.short(data.multiplier or 1)) end
+	if badge then
+		local owned = data.passes and data.passes.DoubleCash
+		badge.Text = owned and ("%dx Cash ✓"):format(DOUBLE_CASH_MULT)
+			or ("%dx Cash"):format(DOUBLE_CASH_MULT)
+	end
 end
 
 -- ── init ───────────────────────────────────────────────────────────────

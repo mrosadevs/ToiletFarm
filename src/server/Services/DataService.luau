@@ -138,6 +138,9 @@ function DataService.push(player: Player, partial: {[string]: any}?)
 			slots = DataService.slots(player),
 			maxTier = Config.maxBuyableTier(p.rebirths),
 			multiplier = DataService.incomeMultiplier(player),
+			-- derived on the server like every other field here; the HUD storefronts
+			-- need to know what is already owned so they can stop advertising it
+			passes = DataService.ownedPasses(player),
 		})
 	end
 end
@@ -154,6 +157,17 @@ end
 function DataService.hasPass(player: Player, passName: string): boolean
 	local Passes = require(script.Parent.PassService)
 	return Passes.has(player, passName)
+end
+
+-- Which passes this player owns. PassService.has caches per user, so this stays a
+-- table lookup after the first call rather than a web call per push.
+function DataService.ownedPasses(player: Player): { [string]: boolean }
+	local Passes = require(script.Parent.PassService)
+	local owned = {}
+	for name, id in pairs(Passes.PASSES) do
+		if id ~= 0 then owned[name] = Passes.has(player, name) end
+	end
+	return owned
 end
 
 -- how many individual poops the player can hold before toilets stop littering

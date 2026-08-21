@@ -54,6 +54,13 @@ complaints about UI scaling on an ultrawide monitor.
 - `GroupJoinPad` handler added and the pad cloned to all six plots; its `PadKind`
   attribute was wrong (`RebirthPad`). **Studio-side edit — needs the place saved.**
 - Buy/Rebirth/Processing/UpgradeBuyTier pads grey out when unaffordable.
+- **The x2 Cash badge advertised "1x Cash"** (`Hud.refresh`). The green PERMANENT
+  badge is a storefront for the DoubleCash gamepass, but it was labelled with
+  `data.multiplier` — the player's *current* multiplier — so anyone who did not own
+  the pass saw a button offering them 1x. It now names what the pass grants, with a
+  ✓ once owned. Pass ownership is replicated as a new derived `passes` field on
+  `DataService.push` (`PassService.has` is cached per user, so this is a table lookup,
+  not a web call per push).
 
 ### Verified
 
