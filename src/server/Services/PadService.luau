@@ -581,6 +581,12 @@ local function ensureGroupBillboard(pad: Model)
 	local copy = donor:Clone()
 	local sub = copy:FindFirstChild("SubLabel", true)
 	if sub then sub:Destroy() end
+	-- Seed the labels: refreshPad only runs on a plot that has an owner, so an empty
+	-- farm would otherwise advertise whatever the donor pad happened to say last.
+	local q = copy:FindFirstChild("Quantity", true)
+	if q and q:IsA("TextLabel") then q.Text = "Group Reward" end
+	local pr = copy:FindFirstChild("Price", true)
+	if pr and pr:IsA("TextLabel") then pr.Text = "Join The Group" end
 	copy.Parent = host
 end
 
