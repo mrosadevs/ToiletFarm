@@ -15,8 +15,10 @@ this file is that the unfinished work stays visible across sessions.
 ## Session 3 - 2026-08-21 - Pad affordability, poop accounting, group reward pad
 
 Live bug list from the partner and from the owner's own playtest, worked through in
-one pass. **Nothing in this entry was playtested**: the Rojo plugin is disconnected
-in Studio, so none of these files ever reached the running game. See "Not verified".
+one pass. The first two thirds of the session ran with `rojo serve` not running at
+all -- nothing was listening on 34872 and the Studio plugin was disconnected, so
+edits reached the filesystem and nowhere else. The owner reconnected it partway
+through and everything below was then playtested in Studio.
 
 ### Done
 
@@ -71,27 +73,50 @@ in Studio, so none of these files ever reached the running game. See "Not verifi
   runtime from whichever pad is already on its own island, so this holds regardless of
   what the place file contains. `2bbf33d`
 
-### Verified
+### Verified in a Studio playtest
 
-- `rojo build` succeeds after every change.
-- `ToiletService.pendingMerges` logic run against 9 synthetic cases in Studio
-  (empty/2/3/8/9/27 of T1, mixed tiers, T30 maxed, T29): all correct, cascades
-  included -- 9 x T1 reports 4, not 3.
-- Every pad kind that gets painted really has a `Plate` child, including MergePad,
-  which had never been painted before.
-- Re-seat geometry dry-run in the live DataModel: all six pads land 31.5 studs from
-  their own base and 48.5 from their own MergePad, identical on every plot; Plot1 is
-  a no-op.
-- A billboard donor exists on all six plots.
-- Collision matrix already correct: `PoopWall` collides with `Poop` only.
+- **Offline claim**, end to end with a real mouse click on the button: modal read
+  "77 Poops" (a count, not a value), tag "x2 = 154 Poops!", price "67" -- the exact
+  number the owner said it should be -- and the basket went 203 -> 280. 203 + 77.
+- **Pickup popups** read `+1` on screen while the cash toasts alongside them still
+  read in dollars, which is the intended split.
+- **Magnetise**: 120 -> 68 poops collected on contact, `AlignPosition` present on a
+  poop in flight, network ownership confirmed handed to the collector, `PoopMagnet`
+  attachment on the root.
+- **Border barriers**: 42 / 42 armed at init. A probe part in the `Poop` group fired
+  at a barrier from 7.4 studs inside bounced back to 35 studs inside -- it never
+  passed through -- and `PoopWall` vs `Characters` is still non-collidable.
+- **Pad colours** on a live farm: Merge grey with nothing to merge and brown after
+  buying 5 of a tier, Upgrade Buy Tier red, every affordable pad brown.
+- **Group pad**: all six re-seated onto their own islands (32 studs from their own
+  base), all six have a billboard, and stepping on it paid $4.81M ($40.1M -> $44.9M)
+  then flipped to "Ready in 9:58" with the plate going grey.
+- **Lucky block** rides 30 studs down the belt in 3s and settles 7.3 studs from the
+  CollectionArea; walking into it opens the menu.
+- **Hologram** legible from the hub floor above the leaderboards (screen captured).
+- Console clean across four play sessions -- no warnings, no errors. Cash, toilets
+  and rebirth count survived all four restarts.
+- `ToiletService.pendingMerges` also run against 9 synthetic cases: cascades correct,
+  9 x T1 reports 4, not 3.
+
+### Found while testing
+
+- **The Upgrade Buy Tier pad had no BillboardGui at all**, on any farm. refreshPad
+  has been computing its label and price four times a second and throwing both away
+  since the pad existed. It now gets the same cloned board the group pad gets, and
+  reads "Upgrade Buy Tier / Porcelain Starter > Primitive Pit" / "388 / 10K Toilets".
+  `269979c`
+- **The lucky block's collider was a 0.2 stud sliver of trim.** The models have no
+  PrimaryPart, so `FindFirstChildWhichIsA` picked whatever came first and the 2.1
+  stud body was left `CanCollide = false`; the block fell straight through the belt
+  and sat on the floor below. Moving the spawn point out of the stall (`15d8014`) was
+  necessary but not sufficient -- the collider is the largest part now. `e0ee7f6`
+- The enlarged hologram had to come DOWN, not up: at `highest + 11` with a board
+  twice as tall you had to crane the camera up from the hub floor. Now `highest + 7`,
+  so its bottom edge sits about a stud above the boards.
 
 ### Not verified / not done
 
-- **Nothing has run in game.** The Rojo plugin is disconnected in Studio: `rojo serve`
-  was not running at the start of the session (no listener on 34872), and after
-  restarting it the plugin did not reconnect on its own. Both datamodels still hold
-  the pre-session sources. Every behavioural claim above is reasoning plus static
-  checks, not a playtest.
 - The `2nd variant pillars` report from session 2 is still open and still unclarified.
 - The owner must still **save the place**: session 2's CastShadow fix (1,889 parts),
   the GroupJoinPad clones and the `PadKind` attribute correction are Workspace edits
@@ -105,11 +130,13 @@ in Studio, so none of these files ever reached the running game. See "Not verifi
 
 ### Next session
 
-1. Connect Rojo in Studio, then playtest the whole list above -- especially the
-   magnetise animation, the border barriers (walk through one, roll a poop into it)
-   and the group pad on a farm other than Plot1.
-2. Test the group pad with an account that is NOT in group 696602381.
-3. Decide the group reward numbers after seeing them in play.
+1. Test the group pad with an account that is NOT in group 696602381 -- the join
+   prompt path is the one branch that has still never been watched running.
+2. Play the group pad on a farm other than Plot1. The re-seating was verified
+   geometrically on all six, but only Plot1's pad has been stood on.
+3. Decide the group reward numbers ($4.81M on a $40M balance) after living with them.
+4. Check whether the magnetise still reads smoothly with several players collecting
+   at once -- it was tested single-player.
 
 ---
 

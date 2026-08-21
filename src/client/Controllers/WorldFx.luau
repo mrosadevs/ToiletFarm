@@ -293,7 +293,12 @@ local function hologramAnchor(): CFrame
 		end
 		if count > 0 then
 			local centre = sum / count
-			return CFrame.new(centre.X, highest + 11, centre.Z)
+			-- Sits just clear of the leaderboard tops. The board is 12.4 studs tall and
+			-- centred on this point, so +7 leaves its bottom edge about a stud above
+			-- them -- a banner ON the boards. It used to be +11 for a board barely half
+			-- this tall, which after the enlargement put it high enough that you had to
+			-- crane the camera up from the hub floor to read it.
+			return CFrame.new(centre.X, highest + 7, centre.Z)
 		end
 	end
 	local centre = workspace:FindFirstChild("Center")
