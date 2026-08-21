@@ -14,14 +14,68 @@ local UIKit = {}
 -- import responsive without touching a single child's position.
 local DESIGN = Vector2.new(1920, 1080)
 
-function UIKit.bindScale(screen: ScreenGui)
+-- The Figma children are absolute pixels measured from the container's top-left, so
+-- on a container wider than the design they all stay bunched at the left. Convert
+-- each one to the nearest edge (or the centre) once, so widening the container
+-- pushes them out to the real screen edges instead of stranding them mid-screen.
+function UIKit.pinEdges(container: GuiObject, design: Vector2)
+	if container:GetAttribute("EdgesPinned") then return end
+	container:SetAttribute("EdgesPinned", true)
+
+	-- anything whose centre lands within this much of the middle stays centred
+	local CENTRE_BAND = 0.10
+
+	for _, child in ipairs(container:GetChildren()) do
+		if child:IsA("GuiObject") then
+			local pos, size = child.Position, child.Size
+			-- only untouched, top-left anchored children are safe to re-anchor
+			if pos.X.Scale == 0 and pos.Y.Scale == 0 and child.AnchorPoint == Vector2.zero then
+				local w = size.X.Offset + size.X.Scale * design.X
+				local h = size.Y.Offset + size.Y.Scale * design.Y
+
+				local function axis(offset: number, extent: number, span: number): (number, UDim)
+					local centre = offset + extent / 2
+					local middle = span / 2
+					if math.abs(centre - middle) < span * CENTRE_BAND then
+						return 0.5, UDim.new(0.5, centre - middle)
+					elseif centre > middle then
+						-- far edge: position now refers to the child's far edge
+						return 1, UDim.new(1, -(span - (offset + extent)))
+					end
+					return 0, UDim.new(0, offset)
+				end
+
+				local ax, px = axis(pos.X.Offset, w, design.X)
+				local ay, py = axis(pos.Y.Offset, h, design.Y)
+				child.AnchorPoint = Vector2.new(ax, ay)
+				child.Position = UDim2.new(px.Scale, px.Offset, py.Scale, py.Offset)
+			end
+		end
+	end
+end
+
+-- `fill` widens the container to cover the whole viewport (the always-on HUD, whose
+-- children belong on the screen edges). Panels leave it off and stay centred.
+function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
 	local container = screen:FindFirstChild("Container") :: GuiObject?
 	if not container then return end
 
-	-- Make container fill the screen for ultrawide support
-	container.Size = UDim2.fromScale(1, 1)
-	container.Position = UDim2.new(0.5, 0, 0.5, 0)
-	container.AnchorPoint = Vector2.new(0.5, 0.5)
+	-- the authored design size, captured before we ever resize it
+	local design = container:GetAttribute("DesignSize") :: Vector2?
+	if not design then
+		design = Vector2.new(
+			container.Size.X.Offset > 0 and container.Size.X.Offset or DESIGN.X,
+			container.Size.Y.Offset > 0 and container.Size.Y.Offset or DESIGN.Y
+		)
+		container:SetAttribute("DesignSize", design)
+	end
+
+	-- Every panel sits in a Container exactly its own size, and the Container clips.
+	-- That is what cuts the corner off the close button (worse once it grows on
+	-- hover). Nothing useful is ever clipped at this level.
+	container.ClipsDescendants = false
+
+	if fill then UIKit.pinEdges(container, design :: Vector2) end
 
 	local scale = container:FindFirstChild("FigBloxUIViewportScale") :: UIScale?
 	if not scale then
@@ -37,6 +91,14 @@ function UIKit.bindScale(screen: ScreenGui)
 		-- on very narrow screens bump it up a little or the HUD is unreadable
 		if vp.X < 700 then s *= 1.25 end
 		(scale :: UIScale).Scale = s
+		if fill then
+			-- The UIScale multiplies the container's own size too, so asking for
+			-- viewport/scale in design space renders as exactly the viewport: one
+			-- uniform scale, no stretching, and the edges are the real screen edges.
+			container.AnchorPoint = Vector2.new(0.5, 0.5)
+			container.Position = UDim2.fromScale(0.5, 0.5)
+			container.Size = UDim2.fromOffset(vp.X / s, vp.Y / s)
+		end
 	end
 	apply()
 	screen:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply)

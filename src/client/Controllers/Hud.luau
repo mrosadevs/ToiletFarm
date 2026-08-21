@@ -85,9 +85,10 @@ local meterState = { mult = 1, nextRollAt = 0 }
 local function buildFlushMeter()
 	local f = Instance.new("Frame")
 	f.Name = "FlushMeter"
-	-- top-right: the centre is taken by the Home button and the tutorial banner
-	f.AnchorPoint = Vector2.new(1, 0)
-	f.Position = UDim2.fromOffset(1892, 96)
+	-- top-centre, directly under the Home button: it is the thing you sprint to bank
+	-- a good roll against, so it belongs where the eye already is, not in a corner
+	f.AnchorPoint = Vector2.new(0.5, 0)
+	f.Position = UDim2.new(0.5, 0, 0, 110)
 	f.Size = UDim2.fromOffset(300, 96)
 	f.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
 	f.BackgroundTransparency = 0.15
@@ -206,7 +207,9 @@ function Hud.init()
 	screen.Enabled = true
 	screen.ResetOnSpawn = false
 	screen.DisplayOrder = 10
-	UIKit.bindScale(screen)
+	-- fill: the HUD's children belong on the screen edges, not inside a centred
+	-- 1920x1080 letterbox, or an ultrawide leaves them stranded mid-screen
+	UIKit.bindScale(screen, true)
 	C = screen:WaitForChild("Container") :: Frame
 
 	collectPacks()
