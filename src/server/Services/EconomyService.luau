@@ -30,8 +30,9 @@ local queueCash:  { [Player]: number } = {}
 -- What the offline modal is currently offering, so Claim can't be replayed for more.
 -- `offlineClaimed` keeps the amount after a plain claim so that a DoubleOffline
 -- purchase arriving afterwards can still pay the second half.
-local offlineOffer: { [Player]: number } = {}
-local offlineClaimed: { [Player]: number } = {}
+type OfflineOffer = { value: number, items: number }
+local offlineOffer: { [Player]: OfflineOffer } = {}
+local offlineClaimed: { [Player]: OfflineOffer } = {}
 
 function EconomyService.pendingCash(player: Player): number
 	return pending[player] or 0
@@ -322,12 +323,28 @@ function EconomyService.reportOffline(player: Player)
 	local hasPass = PassService.has(player, "ExtendedSeptic")
 	-- rateAtLogout is persisted, never recomputed: recomputing pays out at today's
 	-- tier table for time earned under yesterday's
-	local poops = Config.offlinePoop(p.rateAtLogout or 0, away, hasPass)
-	if poops <= 0 then return end
+	local value = Config.offlinePoop(p.rateAtLogout or 0, away, hasPass)
+	if value <= 0 then return end
 
-	offlineOffer[player] = poops
+	local items = Config.offlineItems(p.itemRateAtLogout or 0, away, hasPass)
+	if items <= 0 then
+		-- profiles saved before itemRateAtLogout existed only recorded the value rate.
+		-- Divide by today's average poop value rather than paying zero items, which
+		-- would leave the basket reading 0 after a claim.
+		local rateNow, itemsNow = DataService.poopRate(player), DataService.poopItemRate(player)
+		local avg = itemsNow > 0 and (rateNow / itemsNow) or 1
+		items = math.max(1, math.floor(value / math.max(avg, 1)))
+	end
+
+	offlineOffer[player] = { value = value, items = items }
 	offlineClaimed[player] = nil
-	OfflineEvent:FireClient(player, { poops = poops, seconds = math.min(away, hasPass and Config.OFFLINE_CAP_PASS or Config.OFFLINE_CAP) })
+	-- `poops` is the COUNT, because that is what the modal says and what the basket
+	-- will show; `value` is what it banks.
+	OfflineEvent:FireClient(player, {
+		poops = items,
+		value = value,
+		seconds = math.min(away, hasPass and Config.OFFLINE_CAP_PASS or Config.OFFLINE_CAP),
+	})
 end
 
 -- `doubled` is only ever passed by the DoubleOffline receipt handler, never by the
@@ -339,32 +356,36 @@ function EconomyService.claimOffline(player: Player, doubled: boolean?)
 	local p = DataService.get(player)
 	if not p then return end
 
-	local amount
+	local grant: OfflineOffer?
 	if doubled then
-		if offlineOffer[player] then
+		local offer = offlineOffer[player]
+		local claimed = offlineClaimed[player]
+		if offer then
 			-- bought before claiming: pay both halves at once
-			amount = offlineOffer[player] * 2
-		elseif offlineClaimed[player] then
+			grant = { value = offer.value * 2, items = offer.items * 2 }
+		elseif claimed then
 			-- already claimed at 1x: pay only the bonus half
-			amount = offlineClaimed[player]
+			grant = claimed
 		end
 		-- either way the doubling is spent, so a second purchase cannot re-double
 		offlineClaimed[player] = nil
 	else
-		amount = offlineOffer[player]
-		if amount then offlineClaimed[player] = amount end
+		grant = offlineOffer[player]
+		if grant then offlineClaimed[player] = grant end
 	end
 
 	offlineOffer[player] = nil
 	-- Nothing outstanding. Returning falsy keeps ProcessReceipt on NotProcessedYet,
 	-- which leaves the purchase uncharged rather than taking Robux for nothing.
-	if not amount or amount <= 0 then return end
+	if not grant or grant.value <= 0 then return end
 
-	-- The offline pile arrives as one lump of value rather than as individual poops,
-	-- so it bypasses the item cap by design — the player still has to walk it to the
-	-- Septic Tank, which is the point of paying out in poop instead of cash.
-	p.poops += amount
-	DataService.push(player, { poops = p.poops })
+	-- Credit BOTH halves. Adding only the value left the basket reading the same
+	-- count it did before the claim, which is why claiming looked like it did nothing.
+	-- There is no carry cap any more, so nothing here is clamped: the player still has
+	-- to walk it to the Septic Tank, which is the point of paying out in poop.
+	p.poops += grant.value
+	p.poopItems += grant.items
+	DataService.push(player, { poops = p.poops, poopItems = p.poopItems })
 	return true
 end
 

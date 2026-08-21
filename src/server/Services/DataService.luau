@@ -82,7 +82,11 @@ function DataService.default()
 		-- uptime-based cooldown resets every time the player changes server.
 		lastChestAt   = 0,
 		lastLogout    = 0,
+		-- Two rates, because offline pay has to arrive in both currencies: the value
+		-- the basket banks and the item count the basket displays. Crediting only the
+		-- value made Claim look like it did nothing at all.
 		rateAtLogout  = 0,
+		itemRateAtLogout = 0,
 		version       = 1,
 	}
 end
@@ -226,6 +230,20 @@ function DataService.poopRate(player: Player): number
 	return total
 end
 
+-- How many individual poops the farm drops per second. poopRate is the same sum
+-- weighted by value; the offline payout needs both, since one is what the basket
+-- banks and the other is what the basket counts.
+function DataService.poopItemRate(player: Player): number
+	local p = profiles[player]
+	if not p then return 0 end
+	local speed = 1 - 0.03 * (p.upgrades.FlushSpeed or 0)
+	local total = 0
+	for _, t in ipairs(p.toilets) do
+		total += 1 / (Config.dropInterval(t.tier) * speed)
+	end
+	return total
+end
+
 -- ── load / save ───────────────────────────────────────────────────────────
 -- Every write goes through UpdateAsync so the read-modify-write is atomic against
 -- other servers, and so a save can refuse to clobber a profile this server no
@@ -326,6 +344,7 @@ function DataService.save(player: Player, isFinal: boolean?): boolean
 	if isFinal then
 		p.lastLogout = os.time()
 		p.rateAtLogout = DataService.poopRate(player)
+		p.itemRateAtLogout = DataService.poopItemRate(player)
 	end
 	if studioNoApi then return true end
 

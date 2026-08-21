@@ -81,7 +81,10 @@ end
 function Popups.poopBurst(entries: { any })
 	task.spawn(function()
 		for i, e in ipairs(entries) do
-			Popups.poopGain(e.value, e.value >= 1000)
+			-- One poop is +1. This used to print the poop's cash VALUE, so picking up a
+			-- single poop worth 19 flashed "+19" while the basket went up by one.
+			-- The value still decides whether it gets the big gold treatment.
+			Popups.poopGain(1, e.value >= 1000)
 			Audio.playVaried("PoopPlop", 0.15)
 			if i % 3 == 0 then task.wait(0.05) end
 		end

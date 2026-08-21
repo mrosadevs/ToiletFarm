@@ -445,6 +445,14 @@ function Config.offlinePoop(rateAtLogout: number, secondsAway: number, hasPass: 
 	return math.floor(rateAtLogout * t * Config.OFFLINE_RATE)
 end
 
+-- The same window in physical poops rather than value, so the modal can quote the
+-- number the basket will actually show and Claim can credit both.
+function Config.offlineItems(itemRateAtLogout: number, secondsAway: number, hasPass: boolean): number
+	local cap = hasPass and Config.OFFLINE_CAP_PASS or Config.OFFLINE_CAP
+	local t = math.clamp(secondsAway, 0, cap)
+	return math.floor(itemRateAtLogout * t * Config.OFFLINE_RATE)
+end
+
 -- ── Cash packs ───────────────────────────────────────────────────────────
 -- The three green buttons down the left of the HUD. What they pay scales with the
 -- player's current balance, so they stay meaningful at every stage instead of
