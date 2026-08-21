@@ -81,6 +81,13 @@ local function refreshPad(pad: Model, player: Player)
 		if sub then sub.Text = amount >= 100 and "(Auto Merge)" or "" end
 		if price then price.Text = "$" .. Format.cash(unit * amount) end
 		pad:SetAttribute("PreviewTier", tier)
+
+		-- color plate grey if unaffordable
+		local plate = pad:FindFirstChild("Plate") :: BasePart?
+		if plate then
+			local can_afford = tier ~= nil and p.cash >= (unit * amount)
+			plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
+		end
 	elseif kind == "CollectCashPad" then
 		if quantity then quantity.Text = "Collect Cash" end
 		if price then price.Text = "$" .. Format.cash(EconomyService.pendingCash(player)) end
@@ -96,18 +103,32 @@ local function refreshPad(pad: Model, player: Player)
 		local cost = Config.processCost(level)
 		if price then price.Text = cost and ("$" .. Format.cash(cost)) or "MAX" end
 
+		local plate = pad:FindFirstChild("Plate") :: BasePart?
+		if plate then
+			local can_afford = cost ~= nil and p.cash >= cost
+			plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
+		end
+
 	elseif kind == "DepositPad" then
 		if quantity then quantity.Text = ("Deposit %s Poops"):format(Format.short(p.poops)) end
 	elseif kind == "RebirthPad" then
 		local cost = Config.rebirthCost(p.rebirths)
 		if quantity then quantity.Text = cost and ("Rebirth %d"):format(p.rebirths + 1) or "MAX REBIRTH" end
 		if price then price.Text = cost and ("$" .. Format.cash(cost)) or "" end
+
+		local plate = pad:FindFirstChild("Plate") :: BasePart?
+		if plate then
+			local can_afford = cost ~= nil and p.cash >= cost
+			plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
+		end
 	elseif kind == "UpgradeBuyTierPad" then
 		local tier = p.buyTier or 1
 		local ceiling = Config.maxBuyTier(p.rebirths)
+		local plate = pad:FindFirstChild("Plate") :: BasePart?
 		if tier >= ceiling then
 			if quantity then quantity.Text = "Upgrade Buy Tier" end
 			if price then price.Text = ("[REQ: Rebirth %d]"):format(p.rebirths + 1) end
+			if plate then plate.Color = Color3.fromRGB(110, 110, 118) end
 		else
 			if quantity then
 				quantity.Text = ("Upgrade Buy Tier\n%s > %s")
@@ -115,10 +136,14 @@ local function refreshPad(pad: Model, player: Player)
 			end
 			local need = Config.buyTierRequirement(tier)
 			local owned = ToiletService.totalToilets(player)
+			local can_afford = owned >= need
 			if price then
-				price.Text = (owned >= need)
+				price.Text = can_afford
 					and ("$" .. Format.cash(Config.buyTierCost(tier)))
 					or ("%s / %s Toilets"):format(Format.short(owned), Format.short(need))
+			end
+			if plate then
+				plate.Color = can_afford and Color3.fromRGB(107, 79, 60) or Color3.fromRGB(110, 110, 118)
 			end
 		end
 	elseif kind == "MergePad" then
