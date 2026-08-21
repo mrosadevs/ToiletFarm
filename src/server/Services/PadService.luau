@@ -547,10 +547,11 @@ local function reseatGroupPads()
 	end
 end
 
--- The group pad was authored without a billboard, so it had nothing to say. Clone
--- the one off a neighbouring pad on the same plot rather than building one from
--- scratch, so it matches the rest of the farm exactly.
-local function ensureGroupBillboard(pad: Model)
+-- Two pads were authored with no billboard at all, so they had nothing to say:
+-- the group pad, and Upgrade Buy Tier -- which refreshPad has been computing text
+-- for all along and throwing away. Clone the board off a neighbouring pad on the
+-- same plot rather than building one from scratch, so it matches the farm exactly.
+local function ensureBillboard(pad: Model, seedQuantity: string, seedPrice: string)
 	for _, d in ipairs(pad:GetDescendants()) do
 		if d:IsA("BillboardGui") then return end
 	end
@@ -584,18 +585,21 @@ local function ensureGroupBillboard(pad: Model)
 	-- Seed the labels: refreshPad only runs on a plot that has an owner, so an empty
 	-- farm would otherwise advertise whatever the donor pad happened to say last.
 	local q = copy:FindFirstChild("Quantity", true)
-	if q and q:IsA("TextLabel") then q.Text = "Group Reward" end
+	if q and q:IsA("TextLabel") then q.Text = seedQuantity end
 	local pr = copy:FindFirstChild("Price", true)
-	if pr and pr:IsA("TextLabel") then pr.Text = "Join The Group" end
+	if pr and pr:IsA("TextLabel") then pr.Text = seedPrice end
 	copy.Parent = host
 end
 
 function PadService.init()
 	reseatGroupPads()
+	local SEED = {
+		GroupJoinPad = { "Group Reward", "Join The Group" },
+		UpgradeBuyTierPad = { "Upgrade Buy Tier", "" },
+	}
 	for _, pad in ipairs(CollectionService:GetTagged("Pad")) do
-		if pad:IsA("Model") and pad:GetAttribute("PadKind") == "GroupJoinPad" then
-			ensureGroupBillboard(pad)
-		end
+		local seed = pad:IsA("Model") and SEED[pad:GetAttribute("PadKind")]
+		if seed then ensureBillboard(pad, seed[1], seed[2]) end
 	end
 
 	-- PadTouch is a tall invisible volume above each plate; the plates themselves are
