@@ -50,7 +50,9 @@ local function collectPacks()
 	for _, c in ipairs(C:GetChildren()) do
 		if c:IsA("Frame") and c.Name == "CashGainChip" then table.insert(packs, c) end
 	end
-	-- top to bottom = small, medium, large
+	-- Top to bottom = small, medium, large. This reads the AUTHORED offsets, so it
+	-- has to run before UIKit.pinEdges re-anchors these to the bottom edge and the
+	-- offsets stop being a screen ordering.
 	table.sort(packs, function(a, b) return a.Position.Y.Offset < b.Position.Y.Offset end)
 
 	for index, chip in ipairs(packs) do
@@ -153,12 +155,15 @@ function Hud.init()
 	screen.Enabled = true
 	screen.ResetOnSpawn = false
 	screen.DisplayOrder = 10
+	C = screen:WaitForChild("Container") :: Frame
+
+	-- BEFORE bindScale: collectPacks decides which chip sells which pack from the
+	-- authored top-to-bottom layout, and pinEdges is about to rewrite those positions
+	collectPacks()
+
 	-- fill: the HUD's children belong on the screen edges, not inside a centred
 	-- 1920x1080 letterbox, or an ultrawide leaves them stranded mid-screen
 	UIKit.bindScale(screen, true)
-	C = screen:WaitForChild("Container") :: Frame
-
-	collectPacks()
 
 	-- The Flush Multiplier is NOT on this screen. It is server-wide, so it lives as a
 	-- hologram over the hub leaderboards where everyone reads the same number --
