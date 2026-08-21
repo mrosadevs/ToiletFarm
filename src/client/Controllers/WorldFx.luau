@@ -330,7 +330,7 @@ function WorldFx.buildFlushHologram()
 	-- Sized in STUDS, not pixels: an offset-sized billboard is enormous up close and
 	-- swallowed the middle of the screen. The leaderboards below it are ~13 studs
 	-- wide, so this sits at about their width.
-	board.Size = UDim2.fromScale(22, 7.2)
+	board.Size = UDim2.fromScale(38, 12.4)
 	board.StudsOffsetWorldSpace = Vector3.new(0, 0, 0)
 	-- it should never punch through the world from another island
 	board.MaxDistance = 400
