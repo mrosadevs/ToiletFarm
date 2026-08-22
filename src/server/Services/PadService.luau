@@ -4,7 +4,6 @@
 
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
-local ServerStorage = game:GetService("ServerStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -534,19 +533,22 @@ function PadService.runSellZone()
 	end
 end
 
--- Where each plot's Rebirth and Group pads belong, in the plot's own frame.
+-- Where each plot's Group and Rebirth pads belong, in the plot's own frame.
 --
--- The first version of this derived the group pad's spot from "whichever group pad
--- is nearest its own plot" -- and on Plot1 that pad IS the plot's rebirth pad, which
--- the owner had renamed into a group pad. So every other plot got a group pad
--- dropped exactly on top of its rebirth pad, and standing there fired both: the
--- reward toast AND the rebirth panel. That is the bug the partner screenshotted.
+-- The spot in front of the FreeMoneySign -- the board reading "Free money every 10
+-- minutes / Like the game + Join the group" -- belongs to the GROUP pad. That is
+-- what the sign advertises, and it is the pad the owner renamed on Plot1 to make it
+-- so. Every other plot had its Rebirth pad parked there instead.
 --
--- The rebirth pad is the anchor now, and the group pad sits a clear 12 studs off it
--- (their touch volumes are 6-7 studs across, so that cannot overlap). Plot1 is also
--- given its rebirth pad back, since renaming it left that farm with no way to
--- rebirth from the world at all.
-local GROUP_PAD_OFFSET = Vector3.new(0, 0, -12)
+-- The previous attempt got this backwards: it treated the rebirth pad as the anchor
+-- and pushed the group pad off it, then cloned a rebirth pad back onto Plot1 -- so
+-- the sign advertising free money had a pad under it reading "Rebirth 3" and a cash
+-- price. The group pad takes the sign's spot on every plot now, and any rebirth pad
+-- that was sharing it steps aside.
+--
+-- Plot1 deliberately keeps NO rebirth pad: the owner converted it on purpose and
+-- asked for it not to be put back. That farm rebirths from the HUD button.
+local REBIRTH_PAD_OFFSET = Vector3.new(0, 0, -12)
 
 local function padOfKind(plot: Instance, kind: string): Model?
 	for _, d in ipairs(plot:GetDescendants()) do
@@ -559,41 +561,36 @@ local function seatPlotPads()
 	local plots = workspace:FindFirstChild("Plots")
 	if not plots then return end
 
-	-- the canonical rebirth placement, taken from any plot that still has one
-	local rebirthRel: CFrame? = nil
+	-- The canonical spot, read off whichever plot still has a pad sitting there.
+	-- Plot1's group pad and every other plot's rebirth pad share the same one.
+	local signRel: CFrame? = nil
 	for _, plot in ipairs(plots:GetChildren()) do
-		local pad = plot:IsA("Model") and padOfKind(plot, "RebirthPad")
-		if pad then
-			rebirthRel = plot:GetPivot():ToObjectSpace(pad:GetPivot())
-			break
+		if plot:IsA("Model") then
+			local pad = padOfKind(plot, "RebirthPad")
+			if pad then
+				signRel = plot:GetPivot():ToObjectSpace(pad:GetPivot())
+				break
+			end
 		end
 	end
-	if not rebirthRel then
-		warn("[PadService] no RebirthPad anywhere -- pads left where they are")
+	if not signRel then
+		warn("[PadService] cannot find the canonical pad spot -- pads left as they are")
 		return
 	end
-
-	local template = ServerStorage:FindFirstChild("Assets")
-	template = template and template:FindFirstChild("PlotTemplate")
-	local rebirthSource = template and padOfKind(template, "RebirthPad")
 
 	for _, plot in ipairs(plots:GetChildren()) do
 		if plot:IsA("Model") then
 			local pivot = plot:GetPivot()
 
-			local rebirth = padOfKind(plot, "RebirthPad")
-			if not rebirth and rebirthSource then
-				rebirth = rebirthSource:Clone()
-				rebirth.Parent = plot:FindFirstChild("Base") or plot
-				print(("[PadService] %s had no RebirthPad -- restored one"):format(plot.Name))
-			end
-			if rebirth then
-				rebirth:PivotTo(pivot * (rebirthRel :: CFrame))
-			end
-
 			local group = padOfKind(plot, "GroupJoinPad")
 			if group then
-				group:PivotTo(pivot * ((rebirthRel :: CFrame) + GROUP_PAD_OFFSET))
+				group:PivotTo(pivot * (signRel :: CFrame))
+			end
+
+			-- shifted clear of the group pad; their touch volumes are 6-7 studs across
+			local rebirth = padOfKind(plot, "RebirthPad")
+			if rebirth then
+				rebirth:PivotTo(pivot * ((signRel :: CFrame) + REBIRTH_PAD_OFFSET))
 			end
 		end
 	end
@@ -648,6 +645,9 @@ function PadService.init()
 	local SEED = {
 		GroupJoinPad = { "Group Reward", "Join The Group" },
 		UpgradeBuyTierPad = { "Upgrade Buy Tier", "" },
+		-- the plots' rebirth pads have no board either, so they never showed the
+		-- cost refreshPad has been computing for them all along
+		RebirthPad = { "Rebirth", "" },
 	}
 	for _, pad in ipairs(CollectionService:GetTagged("Pad")) do
 		local seed = pad:IsA("Model") and SEED[pad:GetAttribute("PadKind")]
