@@ -19,6 +19,9 @@ local Prices = require(Shared.Prices)
 
 -- must match PassService.PRODUCTS.DoubleOffline on the server
 local PRODUCT_DOUBLE_OFFLINE = 3708663796
+-- Rebirth panel, Skip button. The server already had an InstantRebirth product
+-- handler waiting for an id; this is it.
+local PRODUCT_INSTANT_REBIRTH = 3709272645
 
 local UIKit = require(script.Parent.UIKit)
 local Audio = require(script.Parent.Audio)
@@ -330,12 +333,24 @@ local function initRebirth()
 			Screens.close("RebirthScreen")
 		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
 	end
+	-- Skip: rebirth without having earned the cash, for Robux. The grant runs through
+	-- ProcessReceipt on the server (PassService.onProduct "InstantRebirth"), never
+	-- from here -- this only raises the prompt.
 	local skip = panel:FindFirstChild("SkipButton") :: Frame?
 	if skip then
+		local label = skip:FindFirstChild("ButtonLabel", true) :: TextLabel?
+		if label then
+			local shown = Prices.product("InstantRebirth")
+			label.Text = shown and ("Skip  R$" .. shown) or "Skip"
+		end
 		UIKit.makeInteractive(skip, function()
 			Audio.play("UiClick")
-			Popups.toast("Instant Rebirth coming soon!", "info")
-		end)
+			if Config.rebirthCost(State.data.rebirths or 0) == nil then
+				Popups.toast("You're at max rebirth!", "error")
+				return
+			end
+			MarketplaceService:PromptProductPurchase(player, PRODUCT_INSTANT_REBIRTH)
+		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
 	end
 end
 

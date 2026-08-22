@@ -50,6 +50,8 @@ PassService.PRODUCTS = {
 	LuckyWhite       = 3708596562,
 	-- Welcome Back modal only: doubles the offline poop claim
 	DoubleOffline    = 3708663796,
+	-- the Rebirth panel's Skip button: rebirths you without the cash requirement
+	InstantRebirth   = 3709272645,
 }
 
 local cache: { [number]: { [string]: boolean } } = {}

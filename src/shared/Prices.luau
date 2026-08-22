@@ -31,6 +31,11 @@ Prices.DASHBOARD = {
 	prod_LuckyPurple      = 250,
 	prod_LuckyWhite       = 599,
 	prod_DoubleOffline    = 67,   -- x2 Offline Poops (Welcome Back modal only)
+	-- Instant Rebirth, the Rebirth panel's Skip button. Derived, not read off the
+	-- dashboard: the API reports 90, and ceil(100 * 0.9) = 90 exactly, the same
+	-- relationship FinishProcessing confirms (buyer 15 -> API 14). Worth checking
+	-- against the dashboard's "Current price" column the next time it is open.
+	prod_InstantRebirth   = 100,
 }
 
 local function read(key: string): number?
