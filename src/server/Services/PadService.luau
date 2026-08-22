@@ -4,6 +4,7 @@
 
 local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
+local ServerStorage = game:GetService("ServerStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -533,37 +534,68 @@ function PadService.runSellZone()
 	end
 end
 
--- Every plot has a GroupJoinPad, but the clones were never moved off the plot they
--- were copied from -- all six sat stacked on one farm, so five islands had no
--- visible pad and one had a pile of them. Re-seat each at the same plot-relative
--- CFrame as the one pad that is already sitting on its own island.
-local function reseatGroupPads()
+-- Where each plot's Rebirth and Group pads belong, in the plot's own frame.
+--
+-- The first version of this derived the group pad's spot from "whichever group pad
+-- is nearest its own plot" -- and on Plot1 that pad IS the plot's rebirth pad, which
+-- the owner had renamed into a group pad. So every other plot got a group pad
+-- dropped exactly on top of its rebirth pad, and standing there fired both: the
+-- reward toast AND the rebirth panel. That is the bug the partner screenshotted.
+--
+-- The rebirth pad is the anchor now, and the group pad sits a clear 12 studs off it
+-- (their touch volumes are 6-7 studs across, so that cannot overlap). Plot1 is also
+-- given its rebirth pad back, since renaming it left that farm with no way to
+-- rebirth from the world at all.
+local GROUP_PAD_OFFSET = Vector3.new(0, 0, -12)
+
+local function padOfKind(plot: Instance, kind: string): Model?
+	for _, d in ipairs(plot:GetDescendants()) do
+		if d:IsA("Model") and d:GetAttribute("PadKind") == kind then return d end
+	end
+	return nil
+end
+
+local function seatPlotPads()
 	local plots = workspace:FindFirstChild("Plots")
 	if not plots then return end
 
-	local found: { { pad: Model, plot: Instance } } = {}
+	-- the canonical rebirth placement, taken from any plot that still has one
+	local rebirthRel: CFrame? = nil
 	for _, plot in ipairs(plots:GetChildren()) do
-		if plot:IsA("Model") then
-			for _, d in ipairs(plot:GetDescendants()) do
-				if d:IsA("Model") and d:GetAttribute("PadKind") == "GroupJoinPad" then
-					table.insert(found, { pad = d, plot = plot })
-				end
-			end
+		local pad = plot:IsA("Model") and padOfKind(plot, "RebirthPad")
+		if pad then
+			rebirthRel = plot:GetPivot():ToObjectSpace(pad:GetPivot())
+			break
 		end
 	end
-	if #found < 2 then return end
-
-	-- the reference is whichever pad is nearest the plot it actually belongs to
-	local ref, best = nil, math.huge
-	for _, e in ipairs(found) do
-		local d = (e.pad:GetPivot().Position - (e.plot :: Model):GetPivot().Position).Magnitude
-		if d < best then ref, best = e, d end
+	if not rebirthRel then
+		warn("[PadService] no RebirthPad anywhere -- pads left where they are")
+		return
 	end
-	if not ref then return end
 
-	local rel = (ref.plot :: Model):GetPivot():ToObjectSpace(ref.pad:GetPivot())
-	for _, e in ipairs(found) do
-		e.pad:PivotTo((e.plot :: Model):GetPivot() * rel)
+	local template = ServerStorage:FindFirstChild("Assets")
+	template = template and template:FindFirstChild("PlotTemplate")
+	local rebirthSource = template and padOfKind(template, "RebirthPad")
+
+	for _, plot in ipairs(plots:GetChildren()) do
+		if plot:IsA("Model") then
+			local pivot = plot:GetPivot()
+
+			local rebirth = padOfKind(plot, "RebirthPad")
+			if not rebirth and rebirthSource then
+				rebirth = rebirthSource:Clone()
+				rebirth.Parent = plot:FindFirstChild("Base") or plot
+				print(("[PadService] %s had no RebirthPad -- restored one"):format(plot.Name))
+			end
+			if rebirth then
+				rebirth:PivotTo(pivot * (rebirthRel :: CFrame))
+			end
+
+			local group = padOfKind(plot, "GroupJoinPad")
+			if group then
+				group:PivotTo(pivot * ((rebirthRel :: CFrame) + GROUP_PAD_OFFSET))
+			end
+		end
 	end
 end
 
@@ -612,7 +644,7 @@ local function ensureBillboard(pad: Model, seedQuantity: string, seedPrice: stri
 end
 
 function PadService.init()
-	reseatGroupPads()
+	seatPlotPads()
 	local SEED = {
 		GroupJoinPad = { "Group Reward", "Join The Group" },
 		UpgradeBuyTierPad = { "Upgrade Buy Tier", "" },
