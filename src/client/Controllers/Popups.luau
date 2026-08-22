@@ -54,13 +54,15 @@ local BASKET_ANCHOR = UDim2.fromScale(0.5, 0.80)
 -- One gradient per tier, cycled, so a heap of mixed droppings comes up in mixed
 -- colours instead of a column of identical white numbers. Keyed to the tier rather
 -- than random, so the same toilet always reads the same way.
+-- Saturated top to bottom. These started at near-white and read as pastel once the
+-- black stroke was around them; a gradient on text wants real colour at both ends.
 local GAIN_GRADIENTS = {
-	ColorSequence.new(Color3.fromRGB(255, 245, 170), Color3.fromRGB(255, 170,  40)),
-	ColorSequence.new(Color3.fromRGB(180, 255, 190), Color3.fromRGB( 40, 200,  90)),
-	ColorSequence.new(Color3.fromRGB(180, 235, 255), Color3.fromRGB( 40, 150, 255)),
-	ColorSequence.new(Color3.fromRGB(255, 200, 235), Color3.fromRGB(230,  70, 180)),
-	ColorSequence.new(Color3.fromRGB(225, 200, 255), Color3.fromRGB(140,  70, 240)),
-	ColorSequence.new(Color3.fromRGB(255, 210, 175), Color3.fromRGB(240, 110,  50)),
+	ColorSequence.new(Color3.fromRGB(255, 225,  60), Color3.fromRGB(240, 120,   0)),
+	ColorSequence.new(Color3.fromRGB(120, 255, 120), Color3.fromRGB(  0, 175,  55)),
+	ColorSequence.new(Color3.fromRGB(110, 225, 255), Color3.fromRGB(  0, 120, 245)),
+	ColorSequence.new(Color3.fromRGB(255, 130, 210), Color3.fromRGB(215,   0, 140)),
+	ColorSequence.new(Color3.fromRGB(200, 150, 255), Color3.fromRGB(115,  30, 235)),
+	ColorSequence.new(Color3.fromRGB(255, 165, 100), Color3.fromRGB(230,  70,  10)),
 }
 
 function Popups.poopGain(amount: number, big: boolean?, tier: number?)

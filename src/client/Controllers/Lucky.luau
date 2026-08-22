@@ -23,8 +23,9 @@ local gui = player:WaitForChild("PlayerGui")
 
 local Lucky = {}
 
--- how far across the screen the popup sits, as a share of the width
-local LUCKY_PANEL_X = 0.3
+-- How far across the screen the popup sits, as a share of the width. On the right
+-- now, but stopping short of the Index and Rebirth buttons pinned to that edge.
+local LUCKY_PANEL_X = 0.72
 
 local ROBUX_ICON = "rbxassetid://131220159429721"
 local BLOCK_IDS = { "Basic", "Green", "Ice", "Purple", "White" }
@@ -61,9 +62,9 @@ local RAINBOW = ColorSequence.new({
 -- every row came out the same washed-out colour. The tier is still printed under
 -- each name, so nothing is lost by colouring the row rather than the rarity band.
 local ROW_GRADIENTS = {
-	ColorSequence.new(Color3.fromRGB(255, 226, 140), Color3.fromRGB(255, 150,  40)),
-	ColorSequence.new(Color3.fromRGB(170, 240, 255), Color3.fromRGB( 40, 170, 255)),
-	ColorSequence.new(Color3.fromRGB(190, 255, 175), Color3.fromRGB( 60, 200,  70)),
+	ColorSequence.new(Color3.fromRGB(255, 215,  70), Color3.fromRGB(240, 125,   0)),
+	ColorSequence.new(Color3.fromRGB(110, 225, 255), Color3.fromRGB(  0, 125, 245)),
+	ColorSequence.new(Color3.fromRGB(130, 255, 120), Color3.fromRGB(  0, 180,  55)),
 }
 
 -- Divine still overrides everything with the rainbow: at that point the rarity is
@@ -173,20 +174,13 @@ local function bind(blockId: string)
 	screen.DisplayOrder = 30
 	UIKit.bindScale(screen)
 
-	-- Sat dead centre, right over the middle of the farm you are looking at. Moved
-	-- to the left third: clear of the Index and Rebirth buttons down the right-hand
-	-- side, and still clear of the cash chips on the far left. bindScale only takes
-	-- over a container's position in fill mode, so setting it here sticks.
-	local frame = screen:FindFirstChild("Container")
-	if frame and frame:IsA("GuiObject") then
-		frame.AnchorPoint = Vector2.new(0.5, 0.5)
-		frame.Position = UDim2.fromScale(LUCKY_PANEL_X, 0.5)
-	end
-
 	local container = screen:WaitForChild("Container") :: GuiObject
-	-- park it toward the left so it does not sit on top of the player
+	-- Parked off to one side so it does not sit on top of the player. There were two
+	-- of these for a moment -- an older hardcoded 0.24 further down silently undid the
+	-- one above it, which is why moving the panel appeared to do nothing.
+	-- bindScale only takes over a container's position in fill mode, so this sticks.
 	container.AnchorPoint = Vector2.new(0.5, 0.5)
-	container.Position = UDim2.fromScale(0.24, 0.5)
+	container.Position = UDim2.fromScale(LUCKY_PANEL_X, 0.5)
 	local panel = container:WaitForChild("Face") :: GuiObject
 
 	local refs: any = {

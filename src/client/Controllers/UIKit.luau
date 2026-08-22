@@ -75,13 +75,17 @@ end
 -- Gradient text, used by the lucky panel, the pickup numbers and the offline tag.
 -- A UIGradient MULTIPLIES TextColor3, so anything it is applied to has to be white
 -- underneath or the gradient comes out muddy -- UIKit.gradient handles that.
+-- Fully saturated, and seven stops packed across the label rather than six spread
+-- thin: the earlier set was mid-bright, so blended over a short word like "+30" it
+-- washed out to pastel and you never really saw the spectrum.
 UIKit.RAINBOW = ColorSequence.new({
-	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,  90, 120)),
-	ColorSequenceKeypoint.new(0.20, Color3.fromRGB(255, 190,  60)),
-	ColorSequenceKeypoint.new(0.40, Color3.fromRGB(120, 240,  90)),
-	ColorSequenceKeypoint.new(0.60, Color3.fromRGB( 80, 220, 255)),
-	ColorSequenceKeypoint.new(0.80, Color3.fromRGB(150, 130, 255)),
-	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 110, 220)),
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,  40,  60)),
+	ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 140,   0)),
+	ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230,   0)),
+	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(  0, 220,  70)),
+	ColorSequenceKeypoint.new(0.67, Color3.fromRGB(  0, 190, 255)),
+	ColorSequenceKeypoint.new(0.83, Color3.fromRGB(130,  60, 255)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255,   0, 190)),
 })
 
 function UIKit.gradient(label: TextLabel, seq: ColorSequence, rotation: number?)
