@@ -58,6 +58,153 @@ end
 -- fade-in tweens still running per stall, so a later hide can cancel them
 local stallTweens: { [Model]: { Tween } } = {}
 
+-- ── stacked stalls ───────────────────────────────────────────────────────
+-- Two things were wrong with a stack of stalls, both visible from the hub island.
+--
+-- The rows are authored 8.75 studs apart while a stall is 8.25 tall, so every level
+-- floated half a stud above the one below and the seam read as a gap. And the
+-- reference the owner built (Workspace.StackedStalls) shows what a stack should look
+-- like: flush, with two pillars at the FRONT of the lower stall carrying the one
+-- above -- and no pillars at all when nothing is stacked on it.
+--
+-- Both are done here at boot rather than in Studio, so they hold for every plot and
+-- survive whatever the place file happens to contain. Re-seating is idempotent: a
+-- row already sitting flush is not moved.
+
+-- taken off the owner's reference stall: how far forward of the side wall a pillar
+-- stands, and how thick it is across and deep
+local PILLAR_FORWARD = 2.25
+local PILLAR_WIDTH = 0.57
+local PILLAR_DEPTH = 0.75
+
+-- The two side walls and the back wall are the three full-height parts. The side
+-- walls are the matching pair; whatever is left is the back.
+local function stallFrame(stall: Model): (Vector3?, Vector3?, { BasePart })
+	local tall: { BasePart } = {}
+	local tallest = 0
+	for _, p in ipairs(stall:GetChildren()) do
+		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" then
+			tallest = math.max(tallest, p.Size.Y)
+		end
+	end
+	for _, p in ipairs(stall:GetChildren()) do
+		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" and math.abs(p.Size.Y - tallest) < 0.01 then
+			table.insert(tall, p)
+		end
+	end
+	if #tall < 3 then return nil, nil, {} end
+
+	-- the pair with matching footprints are the sides; the odd one out is the back
+	local sides: { BasePart } = {}
+	local back: BasePart? = nil
+	for _, a in ipairs(tall) do
+		local matches = 0
+		for _, b in ipairs(tall) do
+			if a ~= b and (a.Size - b.Size).Magnitude < 0.01 then matches += 1 end
+		end
+		if matches >= 1 then table.insert(sides, a) else back = a end
+	end
+	if #sides ~= 2 or not back then return nil, nil, {} end
+
+	local centre = (sides[1].Position + sides[2].Position) / 2
+	local away = centre - back.Position
+	local forward = Vector3.new(away.X, 0, away.Z)
+	if forward.Magnitude < 0.01 then return nil, nil, {} end
+	return forward.Unit, centre, sides
+end
+
+local function buildPillars(stall: Model)
+	if stall:FindFirstChild("Pillar1") then return end
+	local forward, _, sides = stallFrame(stall)
+	if not forward then
+		warn(("[PlotService] could not read the frame of %s -- no pillars"):format(stall.Name))
+		return
+	end
+
+	for i, wall in ipairs(sides) do
+		local pos = wall.Position + forward * PILLAR_FORWARD
+		local pillar = Instance.new("Part")
+		pillar.Name = "Pillar" .. i
+		pillar.Size = Vector3.new(PILLAR_WIDTH, wall.Size.Y, PILLAR_DEPTH)
+		pillar.CFrame = CFrame.lookAt(pos, pos + forward)
+		-- borrow the wall's look so a pillar is indistinguishable from the stall
+		pillar.Material = wall.Material
+		pillar.Color = wall.Color
+		pillar.Anchored = true
+		pillar.CanCollide = false
+		pillar.CanQuery = false
+		pillar.CastShadow = wall.CastShadow
+		pillar.Transparency = 1
+		pillar.Parent = stall
+	end
+end
+
+-- Pillars are driven by the stall ABOVE, not by this one, so they are deliberately
+-- excluded from setStallVisible.
+local function setPillarsVisible(stall: Model, visible: boolean)
+	for _, p in ipairs(stall:GetChildren()) do
+		if p:IsA("BasePart") and p.Name:sub(1, 6) == "Pillar" then
+			p.Transparency = visible and 0 or 1
+		end
+	end
+end
+
+-- Rows flush, "which stall is above me" recorded, pillars built for anything that
+-- has an upstairs neighbour.
+local function stackStalls(plot: Model)
+	local stalls = plot:FindFirstChild("Stalls")
+	if not stalls then return end
+
+	local rows: { [number]: { Model } } = {}
+	local keys: { number } = {}
+	for _, stall in ipairs(stalls:GetChildren()) do
+		if stall:IsA("Model") then
+			local y = math.floor(stall:GetPivot().Position.Y * 100 + 0.5) / 100
+			if not rows[y] then
+				rows[y] = {}
+				table.insert(keys, y)
+			end
+			table.insert(rows[y], stall)
+		end
+	end
+	if #keys < 2 then return end
+	table.sort(keys)
+
+	-- one stall's height is the spacing a flush stack wants
+	local _, _, sides = stallFrame(rows[keys[1]][1])
+	local height = (#sides > 0) and sides[1].Size.Y or nil
+	if not height then return end
+
+	local baseY = keys[1]
+	for index, y in ipairs(keys) do
+		local wantY = baseY + (index - 1) * height
+		local delta = wantY - y
+		if math.abs(delta) > 0.001 then
+			for _, stall in ipairs(rows[y]) do
+				stall:PivotTo(stall:GetPivot() + Vector3.new(0, delta, 0))
+			end
+		end
+	end
+
+	-- match each stall to the one directly above it and give it pillars
+	for index = 1, #keys - 1 do
+		for _, lower in ipairs(rows[keys[index]]) do
+			local lp = lower:GetPivot().Position
+			for _, upper in ipairs(rows[keys[index + 1]]) do
+				local up = upper:GetPivot().Position
+				if (Vector2.new(lp.X, lp.Z) - Vector2.new(up.X, up.Z)).Magnitude < 0.5 then
+					lower:SetAttribute("AboveSlot", upper:GetAttribute("Slot"))
+					-- and the reverse, so building into a stall can find the one holding
+					-- it up without walking the whole plot
+					upper:SetAttribute("BelowSlot", lower:GetAttribute("Slot"))
+					buildPillars(lower)
+					break
+				end
+			end
+		end
+	end
+end
+
 local function setStallVisible(stall: Model, visible: boolean, animate: boolean)
 	if stall:GetAttribute("Unlocked") == visible then return end
 	stall:SetAttribute("Unlocked", visible)
@@ -74,7 +221,8 @@ local function setStallVisible(stall: Model, visible: boolean, animate: boolean)
 
 	local tweens: { Tween } = {}
 	for _, p in ipairs(stall:GetDescendants()) do
-		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" then
+		-- pillars answer to the stall above, and ToiletSpot is a marker, not scenery
+		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" and p.Name:sub(1, 6) ~= "Pillar" then
 			p.CanCollide = visible
 			if animate and visible then
 				p.Transparency = 1
@@ -89,6 +237,19 @@ local function setStallVisible(stall: Model, visible: boolean, animate: boolean)
 	stallTweens[stall] = (#tweens > 0) and tweens or nil
 end
 
+-- Called whenever slot `slot` gains or loses a toilet: the stall UNDER it is the one
+-- whose pillars change. buildToilet/clearToilet drive the stalls directly rather than
+-- going through refreshStalls, so without this the pillars only ever updated on a
+-- rejoin.
+local function refreshPillarsUnder(plot: Model, slot: number, occupied: boolean)
+	local stalls = plot:FindFirstChild("Stalls")
+	local changed = stalls and stalls:FindFirstChild(string.format("Stall_%02d", slot))
+	local below = changed and changed:GetAttribute("BelowSlot") :: number?
+	if not below then return end
+	local lower = stalls and stalls:FindFirstChild(string.format("Stall_%02d", below))
+	if lower then setPillarsVisible(lower :: Model, occupied) end
+end
+
 -- A stall only exists once a toilet stands in it — the plot grows with the farm
 -- instead of showing a row of empty boxes on arrival.
 function PlotService.refreshStalls(player: Player)
@@ -100,6 +261,9 @@ function PlotService.refreshStalls(player: Player)
 	for _, stall in ipairs(plot.Stalls:GetChildren()) do
 		local slot = stall:GetAttribute("Slot") :: number
 		setStallVisible(stall, occupied[slot] == true, true)
+		-- a stall shows its pillars only while it is holding one up
+		local above = stall:GetAttribute("AboveSlot") :: number?
+		setPillarsVisible(stall, above ~= nil and occupied[above] == true)
 	end
 end
 
@@ -152,6 +316,7 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 	end
 
 	setStallVisible(stall, true, true)
+	refreshPillarsUnder(plot, slot, true)
 
 	placed[plot] = placed[plot] or {}
 	local old = placed[plot][slot]
@@ -270,6 +435,7 @@ function PlotService.clearToilet(plot: Model, slot: number)
 	if m then m:Destroy(); placed[plot][slot] = nil end
 	local stall = PlotService.stall(plot, slot)
 	if stall then setStallVisible(stall, false, false) end
+	refreshPillarsUnder(plot, slot, false)
 end
 
 -- rebuild every physical toilet from the profile (join, rebirth, merge)
@@ -358,6 +524,7 @@ function PlotService.release(player: Player)
 	placed[plot] = {}
 	for _, stall in ipairs(plot.Stalls:GetChildren()) do
 		setStallVisible(stall, false, false)
+		setPillarsVisible(stall, false)
 	end
 	-- clear any world poop left behind
 	local bin = plot:FindFirstChild("WorldPoops")
@@ -412,9 +579,11 @@ end
 function PlotService.init()
 	for _, plot in ipairs(workspace.Plots:GetChildren()) do
 		plot:SetAttribute("OwnerUserId", 0)
+		stackStalls(plot)
 		for _, stall in ipairs(plot.Stalls:GetChildren()) do
 			stall:SetAttribute("Unlocked", true)   -- force setStallVisible to actually run
 			setStallVisible(stall, false, false)
+			setPillarsVisible(stall, false)
 		end
 		nameplateFor(plot, nil)
 		local bin = Instance.new("Folder")
