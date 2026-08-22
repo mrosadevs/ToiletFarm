@@ -25,7 +25,17 @@ local grid: ScrollingFrame
 local header: TextLabel
 local built = false
 
+-- The grid is authored 1060 wide for four 254 cards and three 14 gaps -- 1058, a
+-- two pixel margin. A ScrollingFrame then takes its scrollbar out of that same
+-- width, so the fourth column had 6 pixels nowhere to go and every card in it was
+-- sliced down the right-hand side. The cell width is therefore MEASURED from what
+-- the frame actually leaves, rather than pasted in, and the inset keeps the cards
+-- off the frame's edges so a card's border is not clipped top or right.
 local CARD = Vector2.new(254, 190)
+local COLUMNS = 4
+local GAP = 14
+local INSET = 10
+local BAR = 10
 
 local function makeCard(key: string, displayName: string, subtitle: string, rarity: string): Frame
 	local card = Instance.new("Frame")
@@ -128,8 +138,13 @@ local function build()
 		layout = Instance.new("UIGridLayout")
 		layout.Parent = grid
 	end
-	layout.CellSize = UDim2.fromOffset(CARD.X, CARD.Y)
-	layout.CellPadding = UDim2.fromOffset(14, 14)
+	-- The authored offset, not AbsoluteSize: a UIScale on the container means the
+	-- absolute figure is in scaled pixels while the layout works in unscaled ones.
+	local frameWidth = grid.Size.X.Offset
+	local usable = frameWidth - BAR - INSET * 2 - GAP * (COLUMNS - 1)
+	local cellWidth = math.max(80, math.floor(usable / COLUMNS))
+	layout.CellSize = UDim2.fromOffset(cellWidth, CARD.Y)
+	layout.CellPadding = UDim2.fromOffset(GAP, GAP)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 
 	for tier = 1, Config.MAX_TIER do
@@ -146,10 +161,12 @@ local function build()
 		card.Parent = grid
 	end
 
-	-- the mockup grid was a plain Frame; make it scroll now that it holds 38 cards
-	local rows = math.ceil(38 / 4)
-	grid.CanvasSize = UDim2.fromOffset(0, rows * (CARD.Y + 14) + 14)
-	grid.ScrollBarThickness = 8
+	-- the mockup grid was a plain Frame; make it scroll now that it holds 38 cards.
+	-- Measured rather than computed from a row count, so the inset is included and a
+	-- change to the card count cannot leave the last row unreachable.
+	grid.CanvasSize = UDim2.new()
+	grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	grid.ScrollBarThickness = BAR
 end
 
 function Index.refresh()
@@ -191,12 +208,21 @@ function Index.init()
 		sf.Position = old.Position
 		sf.BackgroundTransparency = 1
 		sf.BorderSizePixel = 0
-		sf.ScrollBarThickness = 8
+		sf.ScrollBarThickness = BAR
 		sf.ScrollBarImageColor3 = Color3.fromRGB(120, 120, 130)
 		sf.Parent = panel
 		old:Destroy()
 		grid = sf
 	end
+
+	-- Keep the cards off all four edges. Without it the top row sits flush against
+	-- the frame and its border is clipped by the ScrollingFrame's own bounds.
+	local inset = grid:FindFirstChildOfClass("UIPadding") or Instance.new("UIPadding")
+	inset.PaddingTop = UDim.new(0, INSET)
+	inset.PaddingBottom = UDim.new(0, INSET)
+	inset.PaddingLeft = UDim.new(0, INSET)
+	inset.PaddingRight = UDim.new(0, INSET)
+	inset.Parent = grid
 
 	-- a counter line in the title bar
 	local titleBar = panel:FindFirstChild("TitleBar")
