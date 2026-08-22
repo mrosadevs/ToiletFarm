@@ -50,15 +50,17 @@ end
 
 -- Rolls the tier this block awards. Returns the tier and the offset it rolled,
 -- so the reveal can say how far above your Buy Tier you landed.
-function LuckyBlockService.roll(player: Player, blockId: string): (number, number)
+-- `luck` reweights the table toward the rarer outcomes; the Robux unlock passes
+-- Config.LUCKY_ROBUX_LUCK, which is what the button's "400% LUCK" promises.
+function LuckyBlockService.roll(player: Player, blockId: string, luck: number?): (number, number)
 	local block = Config.luckyBlock(blockId)
 	local base = LuckyBlockService.baseTier(player)
 	if not block then return base, 0 end
 
-	local offset = Config.rollLuckyOffset(blockId)
-	-- luck: one extra roll, keep the better of the two
+	local offset = Config.rollLuckyOffset(blockId, luck)
+	-- luck perk: one extra roll, keep the better of the two
 	if math.random() < luckBonus(player) then
-		offset = math.max(offset, Config.rollLuckyOffset(blockId))
+		offset = math.max(offset, Config.rollLuckyOffset(blockId, luck))
 	end
 	return Config.luckyTierFor(base, offset), offset
 end
@@ -175,9 +177,19 @@ function LuckyBlockService.pickup(player: Player, id: string)
 
 	local p = DataService.get(player)
 	if not p then return end
-	table.insert(p.luckyInv, { id = entry.blockId, uid = id })
+
+	-- The price is QUOTED here and stored on the block, then honoured at unlock.
+	--
+	-- It used to be recomputed at click time while the client worked its own out
+	-- when it drew the panel, and the formula moves under both of them: the cash
+	-- share climbs as Auto Collect banks money, and the expected-value term climbs
+	-- with Total Toilets every time a toilet is bought or merged. So a player could
+	-- be looking at "Unlock: $153" with $196 in hand, click, and be told they could
+	-- not afford it -- because by then the server had decided on a bigger number.
+	local cost = LuckyBlockService.unlockCost(player, entry.blockId)
+	table.insert(p.luckyInv, { id = entry.blockId, uid = id, cost = cost })
 	DataService.push(player, { luckyInv = p.luckyInv })
-	PromptEvent:FireClient(player, { blockId = entry.blockId, uid = id })
+	PromptEvent:FireClient(player, { blockId = entry.blockId, uid = id, cost = cost })
 end
 
 local function takeFromInventory(player: Player, blockUid: string)
@@ -220,7 +232,9 @@ function LuckyBlockService.open(player: Player, blockUid: string, paidWithRobux:
 	end
 
 	if not paidWithRobux then
-		local cost = LuckyBlockService.unlockCost(player, entry.id)
+		-- the price quoted when the block was picked up, so what the panel showed is
+		-- what the player pays; only blocks saved before this fall back to a fresh one
+		local cost = tonumber(entry.cost) or LuckyBlockService.unlockCost(player, entry.id)
 		if p.cash < cost then
 			ToastEvent:FireClient(player, "Not enough cash to unlock!", "error")
 			return
@@ -229,7 +243,10 @@ function LuckyBlockService.open(player: Player, blockUid: string, paidWithRobux:
 	end
 
 	takeFromInventory(player, blockUid)
-	local tier, offset = LuckyBlockService.roll(player, entry.id)
+	-- paying Robux is what buys the luck, so it is read from the same flag that
+	-- waived the cash price rather than from anything the client sent
+	local tier, offset = LuckyBlockService.roll(player, entry.id,
+		paidWithRobux and Config.LUCKY_ROBUX_LUCK or nil)
 
 	local slot, why = ToiletService.grant(player, tier)
 	if not slot then

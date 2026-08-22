@@ -23,6 +23,9 @@ local gui = player:WaitForChild("PlayerGui")
 
 local Lucky = {}
 
+-- how far across the screen the popup sits, as a share of the width
+local LUCKY_PANEL_X = 0.3
+
 local ROBUX_ICON = "rbxassetid://131220159429721"
 local BLOCK_IDS = { "Basic", "Green", "Ice", "Purple", "White" }
 
@@ -51,6 +54,28 @@ local RAINBOW = ColorSequence.new({
 	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(168, 107, 255)),
 	ColorSequenceKeypoint.new(1,   Color3.fromRGB( 82, 224, 255)),
 })
+
+-- One vivid gradient per ROW, the way the reference game does it: three rows that
+-- read as three different things at a glance. Rarity alone could not carry that --
+-- Common is grey, and a Basic block's three outcomes are usually all Common, so
+-- every row came out the same washed-out colour. The tier is still printed under
+-- each name, so nothing is lost by colouring the row rather than the rarity band.
+local ROW_GRADIENTS = {
+	ColorSequence.new(Color3.fromRGB(255, 226, 140), Color3.fromRGB(255, 150,  40)),
+	ColorSequence.new(Color3.fromRGB(170, 240, 255), Color3.fromRGB( 40, 170, 255)),
+	ColorSequence.new(Color3.fromRGB(190, 255, 175), Color3.fromRGB( 60, 200,  70)),
+}
+
+-- Divine still overrides everything with the rainbow: at that point the rarity is
+-- the whole story and is worth shouting about.
+local function applyRowGradient(lbl: TextLabel?, index: number, rarity: string)
+	if not lbl then return end
+	if rarity == "Divine" then
+		UIKit.gradient(lbl, RAINBOW, 90)
+	else
+		UIKit.gradient(lbl, ROW_GRADIENTS[(index - 1) % #ROW_GRADIENTS + 1], 90)
+	end
+end
 
 local function applyGradient(lbl: TextLabel, rarity: string)
 	-- Luau will not accept a type-assertion as an assignment target, so narrow
@@ -114,13 +139,19 @@ local function fillRows(refs: any, def: any)
 		if row.mult then row.mult.Visible = on end
 		if row.pct then row.pct.Visible = on end
 		if on then
+			local rarity = Config.rarityOf(e.tier)
 			if row.name then
 				row.name.Text = Config.displayName(e.tier)
-				applyGradient(row.name, Config.rarityOf(e.tier))
+				applyRowGradient(row.name, i, rarity)
 			end
 			-- the old "x5" mutation-multiplier column now carries the tier
 			if row.mult then row.mult.Text = "T" .. tostring(e.tier) end
-			if row.pct then row.pct.Text = ("%.4g%%"):format(e.w / total * 100) end
+			if row.pct then
+				row.pct.Text = ("%.4g%%"):format(e.w / total * 100)
+				-- the odds carry the same colour as the toilet they belong to, so a
+				-- row reads as one thing rather than a name and a loose number
+				applyRowGradient(row.pct, i, rarity)
+			end
 		end
 	end
 end
@@ -141,6 +172,16 @@ local function bind(blockId: string)
 	screen.IgnoreGuiInset = true
 	screen.DisplayOrder = 30
 	UIKit.bindScale(screen)
+
+	-- Sat dead centre, right over the middle of the farm you are looking at. Moved
+	-- to the left third: clear of the Index and Rebirth buttons down the right-hand
+	-- side, and still clear of the cash chips on the far left. bindScale only takes
+	-- over a container's position in fill mode, so setting it here sticks.
+	local frame = screen:FindFirstChild("Container")
+	if frame and frame:IsA("GuiObject") then
+		frame.AnchorPoint = Vector2.new(0.5, 0.5)
+		frame.Position = UDim2.fromScale(LUCKY_PANEL_X, 0.5)
+	end
 
 	local container = screen:WaitForChild("Container") :: GuiObject
 	-- park it toward the left so it does not sit on top of the player
@@ -167,6 +208,29 @@ local function bind(blockId: string)
 			mult = panel:FindFirstChild("OutcomeMult" .. i, true),
 			pct = panel:FindFirstChild("OutcomePct" .. i, true),
 		}
+	end
+
+	-- "400% LUCK" over the Robux button, in rainbow. The number comes from the config
+	-- the server actually rolls with, so the promise cannot drift from the odds.
+	if refs.buyBtn and not refs.buyBtn:FindFirstChild("LuckTag") then
+		local tag = Instance.new("TextLabel")
+		tag.Name = "LuckTag"
+		-- riding the button's own top edge, like the reference, rather than floating
+		-- into the Unlock pill above it
+		tag.AnchorPoint = Vector2.new(0.5, 0.5)
+		tag.Position = UDim2.fromScale(0.5, 0)
+		tag.Size = UDim2.fromScale(0.7, 0.44)
+		tag.BackgroundTransparency = 1
+		tag.Font = Enum.Font.FredokaOne
+		tag.TextScaled = true
+		tag.ZIndex = 20
+		tag.Text = ("%d%% LUCK"):format(math.floor(Config.LUCKY_ROBUX_LUCK * 100))
+		local st = Instance.new("UIStroke")
+		st.Thickness = 3
+		st.Color = Color3.new(0, 0, 0)
+		st.Parent = tag
+		tag.Parent = refs.buyBtn
+		UIKit.gradient(tag, UIKit.RAINBOW, 0)
 	end
 
 	-- the Robux glyph did not survive the Figma import, so put one back
@@ -226,7 +290,7 @@ function Lucky.hide(instant: boolean?)
 	end)
 end
 
-function Lucky.show(blockId: string, uid: string)
+function Lucky.show(blockId: string, uid: string, quoted: number?)
 	local refs = popups[blockId]
 	if not refs then
 		warn("[Lucky] no popup bound for " .. tostring(blockId))
@@ -242,7 +306,9 @@ function Lucky.show(blockId: string, uid: string)
 	if refs.name then refs.name.Text = blockId end
 	fillRows(refs, def)
 	if refs.costLabel then
-		refs.costLabel.Text = "Unlock: $" .. Format.cash(unlockCost(blockId))
+		-- the server's quote, not a number worked out here: computing it locally is
+		-- how the panel ended up advertising a price the server would not honour
+		refs.costLabel.Text = "Unlock: $" .. Format.cash(quoted or unlockCost(blockId))
 	end
 	-- read the live product price so the button can never advertise a number the
 	-- purchase prompt would not charge
@@ -315,7 +381,7 @@ function Lucky.init()
 		bind(id)
 	end
 	Net.event(Net.NAMES.LuckyPrompt).OnClientEvent:Connect(function(payload)
-		Lucky.show(payload.blockId, payload.uid)
+		Lucky.show(payload.blockId, payload.uid, payload.cost)
 	end)
 	Net.event(Net.NAMES.LuckyResult).OnClientEvent:Connect(function(result)
 		Lucky.playOpen(result)

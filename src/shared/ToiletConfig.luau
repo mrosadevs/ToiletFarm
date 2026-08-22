@@ -211,17 +211,31 @@ Config.LUCKY_BLOCKS = {
 -- highest offset any block can roll, so callers can iterate deterministically
 Config.LUCKY_MAX_OFFSET = 8
 
+-- What opening a block with Robux is worth: every outcome above the base tier gets
+-- its weight multiplied by (1 + this), so +4.00 reads as the "400% LUCK" the button
+-- advertises. The base outcome is left alone, so the boost shows up as the rare
+-- rows growing rather than as the whole table sliding.
+Config.LUCKY_ROBUX_LUCK = 4.0
+
 -- Rolls a tier offset for a block. Iterating 0..LUCKY_MAX_OFFSET rather than with
 -- pairs() keeps the result reproducible for a given seed.
-function Config.rollLuckyOffset(blockId: string): number
+-- `luck` multiplies the weight of every outcome ABOVE the base tier: 0 is the
+-- normal table, 4 is the Robux "400% LUCK".
+function Config.rollLuckyOffset(blockId: string, luck: number?): number
 	local block = Config.luckyBlock(blockId)
 	if not block then return 0 end
+	local boost = 1 + math.max(luck or 0, 0)
+	local function weight(off: number): number?
+		local w = block.roll[off]
+		if not w then return nil end
+		return off > 0 and w * boost or w
+	end
 	local total = 0
-	for off = 0, Config.LUCKY_MAX_OFFSET do total += (block.roll[off] or 0) end
+	for off = 0, Config.LUCKY_MAX_OFFSET do total += (weight(off) or 0) end
 	if total <= 0 then return 0 end
 	local r = math.random() * total
 	for off = 0, Config.LUCKY_MAX_OFFSET do
-		local w = block.roll[off]
+		local w = weight(off)
 		if w then
 			r -= w
 			if r <= 0 then return off end

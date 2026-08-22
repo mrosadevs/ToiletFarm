@@ -72,6 +72,38 @@ end
 
 -- `fill` widens the container to cover the whole viewport (the always-on HUD, whose
 -- children belong on the screen edges). Panels leave it off and stay centred.
+-- Gradient text, used by the lucky panel, the pickup numbers and the offline tag.
+-- A UIGradient MULTIPLIES TextColor3, so anything it is applied to has to be white
+-- underneath or the gradient comes out muddy -- UIKit.gradient handles that.
+UIKit.RAINBOW = ColorSequence.new({
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,  90, 120)),
+	ColorSequenceKeypoint.new(0.20, Color3.fromRGB(255, 190,  60)),
+	ColorSequenceKeypoint.new(0.40, Color3.fromRGB(120, 240,  90)),
+	ColorSequenceKeypoint.new(0.60, Color3.fromRGB( 80, 220, 255)),
+	ColorSequenceKeypoint.new(0.80, Color3.fromRGB(150, 130, 255)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 110, 220)),
+})
+
+function UIKit.gradient(label: TextLabel, seq: ColorSequence, rotation: number?)
+	local grad = label:FindFirstChildOfClass("UIGradient")
+	if not grad then
+		grad = Instance.new("UIGradient")
+		grad.Parent = label
+	end
+	grad.Color = seq
+	grad.Rotation = rotation or 90
+	label.TextColor3 = Color3.new(1, 1, 1)
+	return grad
+end
+
+-- a two-stop gradient around one colour, light at the top and deep at the bottom
+function UIKit.tintGradient(label: TextLabel, c: Color3, rotation: number?)
+	return UIKit.gradient(label, ColorSequence.new(
+		c:Lerp(Color3.new(1, 1, 1), 0.45),
+		c:Lerp(Color3.new(0, 0, 0), 0.20)
+	), rotation)
+end
+
 local MARGIN_CLOSE = 4
 -- the largest share of the screen any single panel may occupy
 local PANEL_MAX_WIDTH = 0.92
