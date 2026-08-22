@@ -73,6 +73,9 @@ end
 -- `fill` widens the container to cover the whole viewport (the always-on HUD, whose
 -- children belong on the screen edges). Panels leave it off and stay centred.
 local MARGIN_CLOSE = 4
+-- the largest share of the screen any single panel may occupy
+local PANEL_MAX_WIDTH = 0.92
+local PANEL_MAX_HEIGHT = 0.78
 
 -- The Figma export hangs every panel's close button over the top-right corner --
 -- measured on the Index at 4px past the right edge and 3px above the top. Panels
@@ -179,14 +182,23 @@ function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
 		local s = math.min(vp.X / DESIGN.X, vp.Y / DESIGN.Y)
 		-- on very narrow screens bump it up a little or the HUD is unreadable
 		if vp.X < 700 then s *= 1.25 end
-		-- ...but never past the point where the panel swallows the screen. That
-		-- boost is what made a small window show a Lucky Block menu taller than the
-		-- viewport. Bound the scale by THIS panel's own design size so the result
-		-- always leaves a margin, whatever the panel measures.
+		-- ...but never past the point where the panel swallows the screen. Bound the
+		-- scale by THIS panel's own design size so the result always leaves a margin,
+		-- whatever the panel measures.
+		--
+		-- The height share is deliberately well under 1: the Lucky Block popups are
+		-- authored 559 x 1120, TALLER than the 1080 design space itself, so fitting
+		-- them to the viewport still filled it edge to edge. Panels that fit normally
+		-- are untouched by this -- the Index is 760 tall, so its own fit is smaller
+		-- than the bound and wins.
 		if not fill then
 			local d = container:GetAttribute("DesignSize") :: Vector2?
-			if d and d.X > 0 and d.Y > 0 then
-				s = math.min(s, vp.X * 0.94 / d.X, vp.Y * 0.90 / d.Y)
+			-- A container authored at the full design space is a full-screen overlay
+			-- (TutorialHud), not a dialog: bounding it to a share of the screen
+			-- shrinks the whole layout and moves everything in it.
+			local overlay = d ~= nil and d.X >= DESIGN.X * 0.98 and d.Y >= DESIGN.Y * 0.98
+			if d and not overlay and d.X > 0 and d.Y > 0 then
+				s = math.min(s, vp.X * PANEL_MAX_WIDTH / d.X, vp.Y * PANEL_MAX_HEIGHT / d.Y)
 			end
 		end
 		(scale :: UIScale).Scale = s
