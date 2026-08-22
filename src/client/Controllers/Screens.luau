@@ -1,9 +1,10 @@
 --!strict
 -- Screens — opening and closing the Figma panels with bounce + sound, and the
--- top-left icon row that gets you to Profile / Settings / Codes / Shop.
+-- top-bar icon row that gets you to Codes / Settings / Profile.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local GuiService = game:GetService("GuiService")
 
 local UIKit = require(script.Parent.UIKit)
 local Audio = require(script.Parent.Audio)
@@ -92,21 +93,37 @@ function Screens.toggle(name: string)
 end
 
 -- ── top-left icon row ─────────────────────────────────────────────────────
--- Circular buttons in the Roblox top-bar style, sitting under the real top bar.
+-- Circular buttons that continue the real Roblox top bar, picking up where its own
+-- icons stop -- the row every other tycoon puts them in, rather than a second row
+-- underneath at their own size.
 -- Codes, Settings, Profile -- and nothing else. Index has its own button down the
 -- right-hand side of the HUD, and the Shop icon only ever raised a "coming soon"
 -- toast; buying cash is the + beside the balance now.
 local ICONS = {
-	{ name = "Codes",    screen = "RedeemCodesScreen", icon = "", color = Color3.fromRGB(240, 170, 60),  glyph = "🏷" },
-	{ name = "Settings", screen = "SettingsScreen",    icon = "", color = Color3.fromRGB(120, 130, 150), glyph = "⚙" },
-	{ name = "Profile",  screen = "ProfileScreen",     icon = "", color = Color3.fromRGB(90, 150, 240),  glyph = "👤" },
+	{ name = "Codes",    screen = "RedeemCodesScreen", image = "rbxassetid://94059211188461"  },
+	{ name = "Settings", screen = "SettingsScreen",    image = "rbxassetid://77358150753910"  },
+	{ name = "Profile",  screen = "ProfileScreen",     image = "rbxassetid://118735441671958" },
 }
+
+-- All three as a share of the top bar's height, because that height is what changes
+-- between devices. Measured off a 1:1 screenshot of the real bar: on a 58px bar
+-- Roblox draws 44px chips, 9px apart, starting 11px down. Those land on 0.76, 0.20
+-- and 0.19 exactly, and stay proportional everywhere else.
+--
+-- ICON_TOP is why this hangs off the top edge rather than centring on the inset:
+-- the inset is 58 tall but Roblox's own chips are not centred in it -- they sit
+-- 11px from the top and only 3px off the bottom. Centring put us 5px high.
+local ICON_SCALE = 0.76
+local ICON_GAP = 0.20
+local ICON_TOP = 0.19
 
 function Screens.buildIconRow()
 	local screen = Instance.new("ScreenGui")
 	screen.Name = "TopIcons"
 	screen.ResetOnSpawn = false
-	screen.IgnoreGuiInset = false
+	-- The row lives INSIDE the strip the inset normally pushes everything out of,
+	-- so it has to measure from the true top-left of the screen.
+	screen.IgnoreGuiInset = true
 	screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screen.DisplayOrder = 12
 	screen.Parent = gui
@@ -114,46 +131,45 @@ function Screens.buildIconRow()
 	local row = Instance.new("Frame")
 	row.Name = "Row"
 	row.BackgroundTransparency = 1
-	row.Position = UDim2.new(0, 12, 0, 8)
-	row.Size = UDim2.new(0, 400, 0, 52)
+	row.AnchorPoint = Vector2.new(0, 0.5)
 	row.Parent = screen
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.Padding = UDim.new(0, 8)
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	-- Explicit, and every button gets a LayoutOrder below. With all of them left on
+	-- 0 the layout falls back to sorting by NAME, which quietly ordered the row
+	-- Codes / Profile / Settings -- alphabetical, not the order declared.
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = row
 
-	for _, def in ipairs(ICONS) do
+	local buttons: { Frame } = {}
+
+	for i, def in ipairs(ICONS) do
 		local btn = Instance.new("Frame")
 		btn.Name = def.name
-		btn.Size = UDim2.fromOffset(48, 48)
-		btn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+		btn.LayoutOrder = i
+		btn.BackgroundColor3 = Color3.fromRGB(23, 23, 26)
+		btn.BackgroundTransparency = 0.1
 		btn.BorderSizePixel = 0
 		local corner = Instance.new("UICorner")
 		corner.CornerRadius = UDim.new(1, 0)
 		corner.Parent = btn
-		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 2
-		stroke.Color = def.color
-		stroke.Transparency = 0.25
-		stroke.Parent = btn
 
-		local glyph = Instance.new("TextLabel")
-		glyph.Name = "Glyph"
-		glyph.Size = UDim2.fromScale(1, 1)
-		glyph.BackgroundTransparency = 1
-		glyph.Font = Enum.Font.FredokaOne
-		glyph.TextScaled = true
-		glyph.TextColor3 = Color3.new(1, 1, 1)
-		glyph.Text = def.glyph or "✦"
+		local img = Instance.new("ImageLabel")
+		img.Name = "Icon"
+		img.Size = UDim2.fromScale(1, 1)
+		img.BackgroundTransparency = 1
+		img.ScaleType = Enum.ScaleType.Fit
+		img.Image = def.image
 		local pad = Instance.new("UIPadding")
-		pad.PaddingTop = UDim.new(0, 9); pad.PaddingBottom = UDim.new(0, 9)
-		pad.PaddingLeft = UDim.new(0, 9); pad.PaddingRight = UDim.new(0, 9)
-		pad.Parent = glyph
-		glyph.Parent = btn
+		pad.PaddingTop = UDim.new(0.17, 0); pad.PaddingBottom = UDim.new(0.17, 0)
+		pad.PaddingLeft = UDim.new(0.17, 0); pad.PaddingRight = UDim.new(0.17, 0)
+		pad.Parent = img
+		img.Parent = btn
 
 		btn.Parent = row
+		table.insert(buttons, btn)
 
 		UIKit.makeInteractive(btn, function()
 			Audio.play("UiClick")
@@ -163,6 +179,32 @@ function Screens.buildIconRow()
 			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
 		})
 	end
+
+	-- TopbarInset is the slice of the top bar left OVER for us — it starts where
+	-- Roblox's own run of icons ends, so Min.X is the pixel just past the shop
+	-- basket and Max.X is the right edge of the screen, not the end of their icons.
+	-- (Reading Max.X as "where their icons stop" puts the row off-screen right.)
+	-- It moves, too: the shop icon comes and goes, the bar wraps on a phone, and it
+	-- is a different height on every device. Reading it beats hard-coding an offset
+	-- that is correct on one screen and wrong on all the others.
+	local function relayout()
+		local inset = GuiService.TopbarInset
+		local h = inset.Height
+		if h <= 0 then h = 36 end
+		local size = math.round(h * ICON_SCALE)
+		local gap = math.round(size * ICON_GAP)
+		layout.Padding = UDim.new(0, gap)
+		for _, b in ipairs(buttons) do
+			b.Size = UDim2.fromOffset(size, size)
+		end
+		row.Size = UDim2.fromOffset(size * #buttons + gap * (#buttons - 1), size)
+		-- lined up with the top edge of Roblox's chips, not the middle of the strip
+		local top = math.round(h * ICON_TOP)
+		row.Position = UDim2.fromOffset(inset.Min.X + gap, inset.Min.Y + top + size // 2)
+	end
+
+	relayout()
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(relayout)
 	return screen
 end
 
