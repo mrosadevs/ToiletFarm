@@ -116,11 +116,21 @@ end
 -- How many POOPS one dropping counts as, as opposed to what it is worth. A Tier 8
 -- toilet producing a single item the basket counts as "1" reads as though the tier
 -- did nothing, because the basket is the number the player watches while carrying.
--- The tier is the count, so a T8 drop is 8 poops and a T30 drop is 30 -- generous
--- enough to feel earned, and nothing like the value curve (3.6^tier), which would
--- make the basket meaningless within a few tiers.
+-- The tier drives the count, so a T8 drop is worth 8 times a T1's -- and nothing
+-- like the value curve (3.6^tier), which would make the basket meaningless within a
+-- few tiers.
+--
+-- SCALE exists purely so the numbers feel worth picking up: walking into a heap and
+-- banking 1.2K reads as a haul where 120 reads as loose change. It is display only.
+-- Nothing in the economy is counted in poops -- cash is computed from a dropping's
+-- VALUE, which this does not touch -- so turning it up costs no balance. Everything
+-- the player sees in poops derives from here (basket, deposit banner, selling sign,
+-- offline claim, pickup popups, the tutorial's collect goal), so they all move
+-- together.
+Config.POOP_COUNT_SCALE = 10
+
 function Config.poopCount(tier: number): number
-	return math.max(1, math.floor(tier))
+	return math.max(1, math.floor(tier)) * Config.POOP_COUNT_SCALE
 end
 
 function Config.rarityOf(tier: number): string
@@ -407,9 +417,14 @@ function Config.buyTierCost(tier: number): number
 	return math.floor(Config.buyCost(tier + 1) * 5000)
 end
 
--- how many toilets (merge-equivalents, the "Total Toilets" figure) you must own
+-- How many toilets (merge-equivalents, the "Total Toilets" figure) you must own to
+-- raise the Buy Tier. The first rung was 10K, which is a long way past where a first
+-- run gets to -- so the upgrade pad read as locked for most of the game. Halved, and
+-- every rung above it follows from the same base.
+Config.BUY_TIER_BASE_REQUIREMENT = 5000
+
 function Config.buyTierRequirement(tier: number): number
-	return 10000 * (Config.MERGE_COUNT ^ (tier - 1))
+	return Config.BUY_TIER_BASE_REQUIREMENT * (Config.MERGE_COUNT ^ (tier - 1))
 end
 
 -- kept for older call sites; the ceiling a player may ever buy at

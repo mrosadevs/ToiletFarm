@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared.Net)
+local Config = require(Shared.ToiletConfig)
 local DataService = require(script.Parent.DataService)
 local PlotService = require(script.Parent.PlotService)
 
@@ -16,7 +17,10 @@ local TutorialService = {}
 -- `target` names the pad the arrow trail should point at
 TutorialService.STEPS = {
 	{ id = "buy",     title = "Buy your first toilet!", goal = 1, target = "BuyButton", targetName = "BuyButton_1" },
-	{ id = "collect", title = "Collect 5 Poops",        goal = 5, target = nil            },
+	-- derived from the count scale, so turning that up cannot leave the tutorial
+	-- asking for a target the first dropping already clears
+	{ id = "collect", title = ("Collect %d Poops"):format(5 * Config.POOP_COUNT_SCALE),
+	                                                    goal = 5 * Config.POOP_COUNT_SCALE, target = nil },
 	{ id = "deposit", title = "Deposit your Poops",     goal = 1, target = "DepositPad"    },
 	{ id = "cash",    title = "Collect your Cash!",     goal = 1, target = "CollectCashPad" },
 	{ id = "three",   title = "Get 3 Toilets",          goal = 3, target = "BuyButton", targetName = "BuyButton_1" },
