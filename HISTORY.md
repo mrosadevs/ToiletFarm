@@ -163,6 +163,35 @@ through and everything below was then playtested in Studio.
   item rate is weighted to match. Verified: Count 2/3/4/8 by tier, 75 droppings
   credited 266, popups reading +4/+3/+4.
 
+### Third round of live feedback
+
+- **Auto Collect gamepass did nothing** (`7c13d34`). Two faults, either one enough.
+  `PassService.has` cached the result of a FAILED ownership query -- and
+  `UserOwnsGamePassAsync` throws readily right after a server starts -- so one throw
+  turned off every pass that player owned until they rejoined. And the loop required
+  BOTH the pass and `settings.AutoPoop`, which defaulted to false, so buying it
+  changed nothing until the buyer found a switch. The pass is the product: both
+  toggles default on and are opt-outs for owners now.
+
+  The migration for saved profiles silently did nothing on the first attempt because
+  `schema` was added to the default template, and `reconcile()` fills in every key
+  the template has -- so it stamped every old save as already-migrated before
+  `migrate()` saw it. A missing key is exactly how an un-migrated profile is
+  recognised; it must not be in the template. Verified by parking 40 studs above the
+  farm without walking and watching the basket climb 1.66K -> 1.7K.
+- **The three hub leaderboards work** (`21f7593`). They were authored complete and
+  nothing ever wrote to them, so all three showed the mockup row "#1 name 45.4K".
+  Networth / Total Toilets / Time Played now come from OrderedDataStores written on
+  the profile save cadence, in DataService because it owns DataStoreService access;
+  LeaderboardService only renders. Boards bind by their authored TITLE, not model
+  name. Falls back to the players in this server when the global store is empty or
+  unreachable, so a board is never a blank slab. Header and Main need RECURSIVE
+  lookups -- the boards wrap both in an inner Model.
+- **Flush Multiplier back over the leaderboards** (`1ff19c4`) at 92 x 22 studs, twice
+  its old size, hung 12 studs up so the taller panel clears the boards. This reverses
+  the HUD move from earlier in the session; the trade is unchanged and real -- a
+  billboard shrinks with distance, so it cannot also be read from a farm.
+
 ### Found while testing
 
 - **The Upgrade Buy Tier pad had no BillboardGui at all**, on any farm. refreshPad
@@ -206,7 +235,13 @@ through and everything below was then playtested in Studio.
 3. Decide the group reward numbers ($4.81M on a $40M balance) after living with them.
 4. Check whether the magnetise still reads smoothly with several players collecting
    at once -- it was tested single-player.
-5. **The economy has NOT been balanced end to end.** `Config.poopCount` changed what
+5. **The test save was rebirthed during automated testing.** It is on Rebirth 2 with
+   52 toilets and $31K, down from Rebirth 1 with 4.71K toilets and $5.39M. That is a
+   legitimate rebirth (the multiplier is x10 now), not corruption, but it was not the
+   owner's choice -- driving pads and synthetic UI clicks from the console can land
+   on the rebirth confirm. Worth avoiding synthetic clicks on a save someone cares
+   about, or testing on a throwaway account.
+6. **The economy has NOT been balanced end to end.** `Config.poopCount` changed what
    the basket reads, not what anything earns, and `BUY_PRODUCTION_SECONDS` is a
    single hand-picked constant. Nobody has played a fresh save from $10 to a rebirth
    with these numbers. The knobs are INCOME_RATIO / COST_RATIO, BUY_SCALE_COEFF /
