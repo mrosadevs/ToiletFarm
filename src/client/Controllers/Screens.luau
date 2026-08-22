@@ -93,12 +93,13 @@ end
 
 -- ── top-left icon row ─────────────────────────────────────────────────────
 -- Circular buttons in the Roblox top-bar style, sitting under the real top bar.
+-- Codes, Settings, Profile -- and nothing else. Index has its own button down the
+-- right-hand side of the HUD, and the Shop icon only ever raised a "coming soon"
+-- toast; buying cash is the + beside the balance now.
 local ICONS = {
-	{ name = "Shop",     screen = nil,                 icon = "rbxassetid://116827946662700", color = Color3.fromRGB(60, 200, 90) },
+	{ name = "Codes",    screen = "RedeemCodesScreen", icon = "", color = Color3.fromRGB(240, 170, 60),  glyph = "🏷" },
 	{ name = "Settings", screen = "SettingsScreen",    icon = "", color = Color3.fromRGB(120, 130, 150), glyph = "⚙" },
 	{ name = "Profile",  screen = "ProfileScreen",     icon = "", color = Color3.fromRGB(90, 150, 240),  glyph = "👤" },
-	{ name = "Codes",    screen = "RedeemCodesScreen", icon = "", color = Color3.fromRGB(240, 170, 60),  glyph = "🏷" },
-	{ name = "Index",    screen = "IndexScreen",       icon = "", color = Color3.fromRGB(200, 110, 240), glyph = "📖" },
 }
 
 function Screens.buildIconRow()
@@ -156,23 +157,13 @@ function Screens.buildIconRow()
 
 		UIKit.makeInteractive(btn, function()
 			Audio.play("UiClick")
-			if def.screen then
-				Screens.toggle(def.screen)
-			else
-				Screens.openShop()
-			end
+			Screens.toggle(def.screen)
 		end, {
 			hover = 1.15,
 			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
 		})
 	end
 	return screen
-end
-
--- placeholder until the storefront frame exists
-function Screens.openShop()
-	local Popups = require(script.Parent.Popups)
-	Popups.toast("Shop coming soon!", "info")
 end
 
 return Screens
