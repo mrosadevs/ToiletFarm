@@ -72,12 +72,22 @@ end
 
 -- `fill` widens the container to cover the whole viewport (the always-on HUD, whose
 -- children belong on the screen edges). Panels leave it off and stay centred.
-local MARGIN_CLOSE = 6
+local MARGIN_CLOSE = 4
 
 -- The Figma export hangs every panel's close button over the top-right corner --
--- measured on the Index at 4px past the right edge and 3px above the top. Clipping
--- it off is not the answer (that is the bug this replaced), so the button is moved
--- back inside the panel instead. Idempotent: a button already inside is not moved.
+-- measured on the Index at 4px past the right edge and 3px above the top. Panels
+-- deliberately do not clip (clipping is what used to cut the corner off the button),
+-- so that overhang simply shows.
+--
+-- Moving the BUTTON is what every earlier attempt did, and all of them looked wrong:
+-- clamping it into the corner dropped it 9px below the title bar's centre, and
+-- resizing it to fit the bar made it look tiny. The button is authored 114 tall,
+-- centred on a 108 bar, and that relationship is the thing worth keeping.
+--
+-- So the FRAME grows instead. The panel widens by the overhang plus a little
+-- padding, and the header row -- title bar and close button together, so their
+-- alignment is untouched -- drops by the same amount to clear the top edge.
+-- Idempotent: a button already inside changes nothing.
 function UIKit.tuckCloseButton(container: GuiObject)
 	local close = container:FindFirstChild("CloseButton", true)
 	if not close or not close:IsA("GuiObject") then return end
@@ -87,16 +97,51 @@ function UIKit.tuckCloseButton(container: GuiObject)
 	local pw, ph = panel.Size.X.Offset, panel.Size.Y.Offset
 	local w, h = close.Size.X.Offset, close.Size.Y.Offset
 	if pw <= 0 or ph <= 0 or w <= 0 or h <= 0 then return end
-	if w + MARGIN_CLOSE * 2 > pw or h + MARGIN_CLOSE * 2 > ph then return end
 
-	-- resolve to the button's top-left, clamp, then put the anchor point back
 	local ax, ay = close.AnchorPoint.X, close.AnchorPoint.Y
 	local left = close.Position.X.Scale * pw + close.Position.X.Offset - ax * w
 	local top = close.Position.Y.Scale * ph + close.Position.Y.Offset - ay * h
-	local nl = math.clamp(left, MARGIN_CLOSE, pw - w - MARGIN_CLOSE)
-	local nt = math.clamp(top, MARGIN_CLOSE, ph - h - MARGIN_CLOSE)
-	if math.abs(nl - left) < 0.5 and math.abs(nt - top) < 0.5 then return end
-	close.Position = UDim2.fromOffset(nl + ax * w, nt + ay * h)
+
+	local growRight = (left + w) + MARGIN_CLOSE - pw
+	local dropDown = MARGIN_CLOSE - top
+
+	if growRight > 0 then
+		panel.Size = UDim2.new(panel.Size.X.Scale, pw + growRight, panel.Size.Y.Scale, ph)
+		-- the Container is authored exactly the panel's size and drives the viewport
+		-- fit, so it has to grow with it -- including the design size bindScale
+		-- measured before any of this ran
+		if container:IsA("GuiObject") and container.Size.X.Offset > 0 then
+			container.Size = UDim2.new(
+				container.Size.X.Scale, container.Size.X.Offset + growRight,
+				container.Size.Y.Scale, container.Size.Y.Offset)
+			local design = container:GetAttribute("DesignSize") :: Vector2?
+			if design then
+				container:SetAttribute("DesignSize", Vector2.new(design.X + growRight, design.Y))
+			end
+		end
+	end
+
+	if dropDown > 0 then
+		local bar = panel:FindFirstChild("TitleBar")
+		for _, item in ipairs({ close, bar }) do
+			if item and item:IsA("GuiObject") then
+				item.Position = UDim2.new(
+					item.Position.X.Scale, item.Position.X.Offset,
+					item.Position.Y.Scale, item.Position.Y.Offset + dropDown)
+			end
+		end
+		panel.Size = UDim2.new(panel.Size.X.Scale, panel.Size.X.Offset,
+			panel.Size.Y.Scale, panel.Size.Y.Offset + dropDown)
+		if container:IsA("GuiObject") and container.Size.Y.Offset > 0 then
+			container.Size = UDim2.new(
+				container.Size.X.Scale, container.Size.X.Offset,
+				container.Size.Y.Scale, container.Size.Y.Offset + dropDown)
+			local design = container:GetAttribute("DesignSize") :: Vector2?
+			if design then
+				container:SetAttribute("DesignSize", Vector2.new(design.X, design.Y + dropDown))
+			end
+		end
+	end
 end
 
 function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
