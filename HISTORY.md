@@ -192,6 +192,25 @@ through and everything below was then playtested in Studio.
   the HUD move from earlier in the session; the trade is unchanged and real -- a
   billboard shrinks with distance, so it cannot also be read from a farm.
 
+### Stacked stalls
+
+- **The gap between stacked stall rows, and the missing pillars** (`5ab3d70`). This is
+  what the "2nd variant pillars" note from session 2 turned out to mean, once the
+  owner built `Workspace.StackedStalls` as a reference. Rows are authored 8.75 studs
+  apart while a stall is 8.25 tall, so every level floated half a stud above the one
+  below. Rows are re-seated at boot to exactly one stall height apart (idempotent, and
+  derived from the stall's own height rather than a pasted number), and pillars are
+  built for every stall with an upstairs neighbour, taking size/offset/look straight
+  off the reference: 0.57 x 8.25 x 0.75, 2.25 studs forward of the side wall.
+- Neighbours are matched GEOMETRICALLY rather than by assuming slot + 12 (which does
+  hold on this map -- verified 36/36 -- but would mis-map silently on another layout).
+- Pillars answer to the stall ABOVE, so they are excluded from `setStallVisible` and
+  driven from `refreshStalls` on join plus `buildToilet`/`clearToilet` live. **Wiring
+  only refreshStalls left them updating on rejoin alone**, which the first playtest
+  caught: stalls filled to slot 28 and not one pillar appeared.
+- Checked before moving anything that nothing else on the plot is aligned to the 8.75
+  spacing -- rows 3 and 4 have nothing else at their height at all.
+
 ### Found while testing
 
 - **The Upgrade Buy Tier pad had no BillboardGui at all**, on any farm. refreshPad
@@ -215,7 +234,9 @@ through and everything below was then playtested in Studio.
   speeds, textures and sizes -- compared before deleting) floating at
   (227, 136, -76). The code only ever read the ServerStorage copy. **This is a
   Workspace edit, so it needs the place saved to stick.**
-- The `2nd variant pillars` report from session 2 is still open and still unclarified.
+- ~~The `2nd variant pillars` report~~ -- resolved: it was the stacked-stall gap and
+  the missing support pillars, fixed in `5ab3d70` once the owner built a reference
+  stack in the world to point at.
 - The owner must still **save the place**: session 2's CastShadow fix (1,889 parts),
   the GroupJoinPad clones and the `PadKind` attribute correction are Workspace edits
   Rojo does not own. (The pad *positions* no longer depend on this.)
