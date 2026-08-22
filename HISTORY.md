@@ -12,6 +12,142 @@ this file is that the unfinished work stays visible across sessions.
 
 ---
 
+## Session 4 — 2026-08-22 · Poop scale, lucky panel, freecam, and the top bar
+
+A long round of live feedback from the owner and the partner, then two tools: a
+freecam for a hired trailer editor, and the top-bar icon row rebuilt against a
+reference screenshot.
+
+### Done
+
+- **Ten times the poops, and the first Buy Tier rung halved** (`825da88`,
+  `771e518`). `POOP_COUNT_SCALE = 10` so a T8 drop banks 80 rather than 8 — display
+  only, since cash is computed from a dropping's VALUE, which this does not touch,
+  so the grind is unchanged. Everything shown in poops derives from `poopCount`
+  (basket, deposit banner, selling sign, offline claim, popups, the tutorial goal),
+  so they all moved together. `BUY_TIER_BASE_REQUIREMENT` 10000 → 5000. The selling
+  queue now carries a `queueItems` count beside its value and drains both by the
+  same fraction, so the processing sign quotes the number the player deposited
+  instead of the cash it is worth.
+- **The lucky panel quoted a price the server would not honour** (`5a29826`).
+  Reported as "$196 in hand, $153 on the button, cannot buy". The cost was computed
+  twice — once by the client when it drew the panel, once by the server at click —
+  and the formula moves under both (the cash share climbs as Auto Collect banks, the
+  expected-value term climbs with Total Toilets). The price is now quoted once at
+  pickup, stored on the block, and honoured at unlock; older saved blocks fall back
+  to a fresh quote. **400% LUCK is now real**: `Config.LUCKY_ROBUX_LUCK = 4.0`
+  multiplies the weight of every outcome above the base tier, and the button's label
+  is formatted from that same constant so the promise cannot drift from the odds.
+- **Pickup numbers coloured by tier, offline x2 in rainbow** (`5ffcd75`). The
+  server sends the dropping's tier so a mixed heap comes up in mixed colours.
+  Rainbow was keyed to cash value ≥ 1000, which every dropping clears late-game;
+  it is now reserved for Mythic/Divine.
+- **The Auto Collect Cash toggle did nothing** (`5a24da1`). The loop checked pass
+  ownership and never the setting, so cash kept collecting itself however it was
+  set. The poop loop had always checked both.
+- **The flush was loud and global** (`1048053`). Volume to 30% of what it was, and
+  parented to the dropping with `InverseTapered` falloff over 55 studs, so a hundred
+  toilets on a farm across the map no longer drown the music. `Audio.play` gained a
+  `range` option for this.
+- **Gradients saturated, rainbow tightened, lucky panel moved right** (`d3b4ba0`).
+  The gradient sets started near-white and read as pastel behind a black stroke;
+  both ends now carry real colour. The rainbow went from six spread stops to seven
+  packed ones so a short label actually shows the spectrum. The panel moved to
+  x=0.72, clear of Index and Rebirth. **Two position writers existed** — an older
+  hard-coded `0.24` silently undid the new one, which is why moving the panel
+  appeared to do nothing twice.
+- **A Buy Tier upgrade no longer strands toilets** (`fe02c16`). Raising the tier
+  above a toilet's means it can never be obtained again, so leftovers that cannot
+  reach three of a kind were unmergeable until a rebirth — the two Porcelain
+  Starters the owner was left with. The upgrade now merges first, then buys back
+  what remains below the new tier at today's price and frees the stall. Merging
+  first is the safety: after `mergeAll` no tier can have three of a kind left, so
+  what remains is genuinely stranded.
+- **Freecam for the trailer** (`d19a595`), `client/Controllers/Freecam`. Shift+F
+  detaches the camera, freezes the character, hides the HUD and topbar, and restores
+  everything on exit; H brings the UI back, T hides your own avatar. Position, look,
+  roll and FOV are exponentially smoothed and frame-rate independent. WASD is
+  camera-relative but Q/E stay on world up, because camera-relative lift drifts
+  sideways the moment you are pitched. **Shift+P was the first choice and is wrong**:
+  Studio injects its own freecam on that key into every playtest, both woke at once
+  and took the camera off each other, leaving `CameraType` on Custom where the core
+  camera silently overwrites every CFrame we write. The render-step binding was
+  renamed off "Freecam" for the same reason. That injected one is Studio-only — it
+  is nowhere in `StarterGui`, so a published client has no freecam without ours.
+- **The click sheen never masked to its button** (`8a11f40`). The clipping mask
+  added for it in session 3 could not have worked, twice over: `ClipsDescendants`
+  does not clip a **rotated** descendant, and the bar was rotated 14° for the
+  diagonal; and even square-on it clips to a rectangle and ignores `UICorner`, so it
+  would still spill past every rounded corner and all the way around a circular chip.
+  Replaced with a frame the exact size and shape of the button whose gradient offset
+  sweeps — nothing moves and nothing needs clipping.
+- **The icon row moved into the real Roblox top bar** (`041ecb0`), with the owner's
+  new art. Position and size are read from `GuiService.TopbarInset` on every change.
+  Two traps: that Rect is the slice left **over** for us, so `Min.X` is just past the
+  shop basket while `Max.X` is the right edge of the screen (reading `Max.X` as
+  "where their icons end" put the row off-screen right); and Roblox's chips are not
+  centred in it — on a 58px inset they sit 11px down and 3px off the bottom, so
+  centring sat 5px high. Sizes were measured off a 1:1 screenshot of the real bar:
+  44px chips, 9px apart, 11px down. `LayoutOrder` is now set per button — left at 0
+  the layout sorts by **name**, so the row was alphabetical, not as declared.
+- **Invite-a-friend button** (`3ed3edc`), a fourth chip using `SocialService`:
+  `CanSendGameInviteAsync` in a pcall on the click that needs it, never on a loop,
+  latched while in flight, then `PromptGameInvite` with an `ExperienceInviteOptions`
+  `PromptMessage`.
+
+### Verified in a Studio playtest
+
+- **Freecam**, driving real key events: forward moved 51.9 studs and E rose 20.2;
+  the camera came to a complete stop after release rather than sliding; the
+  character stayed at spawn on WalkSpeed 0; the frame came back clean with only
+  world signage in it. Exiting restored CameraType, subject, FOV, WalkSpeed 20,
+  JumpPower 50, both humanoid displays, the mouse icon, the CoreGui and every
+  ScreenGui it had switched off, with no part left transparent.
+- **Top bar**: chips at x=269/322/375/428, 44×44, 9px apart, top edge y=11 — the
+  same 11 the real chips sit at — in the declared order, all four images loaded.
+- **Sheen**, measured mid-sweep on a circular chip: exact button position and size,
+  rotation 0, matching 1.0 corner radius, destroyed after the tween.
+- **Lucky panel** screen-captured: saturated gold/blue/green rows with matching
+  percentages, rainbow 400% LUCK over the Robux button, panel clear of Index and
+  Rebirth.
+- **Stranded-toilet buyback** against five constructed farms (2 stranded T1s; 50
+  T1s all mergeable; 51 T1s dividing evenly; T1×4 + T2×2 → T3; nothing below the new
+  tier). Pure-logic only — see below.
+
+### Not done / carried forward
+
+- **The owner's save was consumed by testing.** It went from Rebirth 4 / $244M /
+  5.09K toilets to Rebirth 5 / $0 / 1 toilet across this session's playtests. The
+  cause was not established — nothing sent to the client was a rebirth input, and a
+  search for a nearby rebirth pad returned nothing, so a spawn-adjacent pad is
+  unconfirmed either way. **Playtesting has been running on the owner's real
+  profile; it should move to a test account before the next session.**
+- **The buyback has never fired on a live upgrade.** The save is 5.09K of the 15K
+  toilets the next tier needs and closing that gap costs billions. The rule is
+  verified, the wiring is not.
+- **The invite prompt has never been seen open.** `CanSendGameInviteAsync` returns
+  false in a Studio playtest, so the button is inert in Studio by design. Needs a
+  live client.
+- **Freecam gamepad support is untested**, as is the whole thing in a published
+  client — both playtests were Studio.
+- **The place still needs saving by the owner** for the `Workspace.Vfx` deletion,
+  which is a DataModel edit Rojo does not own.
+- **The group-join prompt has still never been watched firing** — needs an account
+  that is not already a member.
+- **A fresh, pass-free save is still needed** to confirm the ten-minute first
+  rebirth against the solved curve.
+- **Part count after the 108-stall change** is ~963 per plot, ~5,800 across six
+  farms. Not investigated for performance.
+- Still open from session 3: the **map geometry deleted without asking**
+  (`SideReturnLeft/Right`, `BackFeederLeft/Right`, `MergeFeederLeft/Right` on all six
+  plots — restore from a place backup if the belts misbehave); the **"2nd variant"
+  pillar report**, which needs the partner to say what it refers to.
+- **`selene` and `stylua` are still not installed on this machine** — only `rojo`,
+  via `aftman`, not the pinned `rokit` toolchain. The 31-warning lint baseline could
+  not be checked at any point this session; `rojo build` was the only gate.
+
+---
+
 ## Session 3 - 2026-08-21 - Pad affordability, poop accounting, group reward pad
 
 Live bug list from the partner and from the owner's own playtest, worked through in
