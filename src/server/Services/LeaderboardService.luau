@@ -27,6 +27,19 @@ local LeaderboardService = {}
 local ROWS = 25
 local REFRESH = 60
 
+-- The authored row is 0.04 of the board tall, so 25 of them fill it exactly and the
+-- text ends up tiny. Taller rows and a gap between them; the rest scrolls.
+local ROW_HEIGHT = 0.085
+local ROW_GAP = 0.006
+
+-- gold, silver, bronze -- the only colour on the board, so the top three read at a
+-- glance against everything else being plain white
+local MEDAL = {
+	Color3.fromRGB(255, 215, 60),
+	Color3.fromRGB(222, 228, 240),
+	Color3.fromRGB(215, 145, 70),
+}
+
 -- authored header title -> the board key DataService publishes under, and how the
 -- number should read
 local BOARDS = {
@@ -43,6 +56,10 @@ type Board = {
 }
 
 local boards: { Board } = {}
+-- defined below render(); collect() calls it, so it is declared up here. Typed,
+-- because a bare `local styleTemplate` infers nil and strict mode rejects the
+-- assignment further down.
+local styleTemplate: (Frame, ScrollingFrame) -> ()
 
 local function titleOf(model: Model): string?
 	-- recursive: the boards wrap Header and Main in an inner Model, so a direct-child
@@ -74,6 +91,7 @@ local function collect()
 				warn(("[LeaderboardService] %s is missing its ScrollingFrame/Template"):format(model.Name))
 			else
 				template.Visible = false
+				styleTemplate(template, list :: ScrollingFrame)
 				-- the rows are added and removed wholesale, so let the frame measure itself
 				list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 				list.CanvasSize = UDim2.fromOffset(0, 0)
@@ -115,6 +133,33 @@ local function localScores(key: string)
 	return out
 end
 
+-- Applied once to the row every later row is cloned from: bigger, and in the game's
+-- own font -- heavy white with a thick black stroke rather than the small yellow
+-- Gotham the mockup shipped with.
+function styleTemplate(template: Frame, list: ScrollingFrame)
+	template.Size = UDim2.fromScale(template.Size.X.Scale, ROW_HEIGHT)
+
+	local layout = list:FindFirstChildOfClass("UIListLayout")
+	if layout then
+		layout.Padding = UDim.new(ROW_GAP, 0)
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+	end
+
+	for _, label in ipairs(template:GetDescendants()) do
+		if label:IsA("TextLabel") then
+			label.Font = Enum.Font.FredokaOne
+			label.TextColor3 = Color3.new(1, 1, 1)
+			label.TextScaled = true
+			local stroke = label:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
+			stroke.Thickness = 3.5
+			stroke.Color = Color3.new(0, 0, 0)
+			stroke.Transparency = 0
+			stroke.Parent = label
+		end
+	end
+end
+
 local function render(board: Board, entries)
 	for _, child in ipairs(board.list:GetChildren()) do
 		if child:IsA("Frame") and child ~= board.template then child:Destroy() end
@@ -126,12 +171,29 @@ local function render(board: Board, entries)
 		row.LayoutOrder = rank
 		row.Visible = true
 
+		local medal = MEDAL[rank]
+
 		local rankLabel = row:FindFirstChild("Rank")
-		if rankLabel and rankLabel:IsA("TextLabel") then rankLabel.Text = "#" .. rank end
+		if rankLabel and rankLabel:IsA("TextLabel") then
+			rankLabel.Text = "#" .. rank
+			rankLabel.TextColor3 = medal or Color3.new(1, 1, 1)
+		end
 		local nameLabel = row:FindFirstChild("plrName")
 		if nameLabel and nameLabel:IsA("TextLabel") then nameLabel.Text = entry.name end
 		local amountLabel = row:FindFirstChild("Amount")
-		if amountLabel and amountLabel:IsA("TextLabel") then amountLabel.Text = board.format(entry.value) end
+		if amountLabel and amountLabel:IsA("TextLabel") then
+			amountLabel.Text = board.format(entry.value)
+			amountLabel.TextColor3 = medal or Color3.new(1, 1, 1)
+		end
+
+		-- a faint plate behind the podium places, so the top of the board has weight
+		if medal then
+			row.BackgroundColor3 = medal
+			row.BackgroundTransparency = 0.82
+			local corner = row:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0.25, 0)
+			corner.Parent = row
+		end
 
 		row.Parent = board.list
 	end
