@@ -192,6 +192,40 @@ through and everything below was then playtested in Studio.
   the HUD move from earlier in the session; the trade is unchanged and real -- a
   billboard shrinks with distance, so it cannot also be read from a farm.
 
+### UI polish round
+
+- **Index grid sliced its fourth column** (`8d66fe5`). Authored 1060 wide for four
+  254 cards and three 14 gaps = 1058; turning it into a ScrollingFrame took the
+  scrollbar out of that same width, leaving the fourth column 6px short. Cell width
+  is measured from what the frame leaves now, plus a 10px inset and automatic canvas.
+- **Robux pads advertised mockup prices on every farm but your own** (`ff68215`).
+  `refreshPad` runs only for the plot's owner, so unowned farms kept 64 / 24 / 16
+  against real prices of 67 / 25 / 15. Those pads refresh on all plots now, owner
+  only deciding the ✓.
+- **Skip button wired to Instant Rebirth** (`ef200d3`, product 3709272645). The
+  server handler had existed since the panel was built but the product had no id, so
+  it was dead code behind a "coming soon" toast. Price 100 is DERIVED (API 90, and
+  ceil(100*0.9)=90, matching FinishProcessing's known 15 -> 14) and should be checked
+  against the dashboard.
+- **Close buttons overhung their panels; the click sheen washed outside its button**
+  (`38014f8`). Both follow from panels deliberately not clipping. The close button is
+  moved inside rather than clipped; the sheen gets a button-sized clipping mask that
+  carries the same corner radius.
+- **Leaderboards restyled** (`e6e2209`): rows 0.04 -> 0.085 of the board with a gap,
+  FredokaOne white on a 3.5 black stroke instead of small yellow Gotham, and
+  gold/silver/bronze on the podium three.
+- **Flush Multiplier "needed a certain angle"** (`931507a`). The main cause was not
+  occlusion: `MaxDistance` was 170, so it switched off whenever the camera was
+  further away than that -- most of the hub once zoomed out. Now 1200. Occlusion is
+  about 1 viewpoint in 10, measured over 144 around the hub, essentially all standing
+  directly behind a board; the anchor went from +12 to +16 to clear most of the rest.
+
+  **`AlwaysOnTop` cannot be used on this billboard** -- it renders nothing at all.
+  Verified three ways: stud-sized, pixel-sized, and with the anchor part made
+  barely-visible in case a fully transparent adornee was culled from the always-on-top
+  pass. All three drew nothing. So a world billboard can never be guaranteed visible;
+  only the HUD can, and that was explicitly rejected.
+
 ### Stacked stalls
 
 - **The gap between stacked stall rows, and the missing pillars** (`5ab3d70`). This is
@@ -256,13 +290,16 @@ through and everything below was then playtested in Studio.
 3. Decide the group reward numbers ($4.81M on a $40M balance) after living with them.
 4. Check whether the magnetise still reads smoothly with several players collecting
    at once -- it was tested single-player.
-5. **The test save was rebirthed during automated testing.** It is on Rebirth 2 with
+5. `AbsoluteSize` on a BillboardGui's children is not a usable readout for "is this
+   rendering" -- it read 0 for configurations that were demonstrably drawing. Use a
+   screen capture, not that property, when checking billboard visibility.
+6. **The test save was rebirthed during automated testing.** It is on Rebirth 2 with
    52 toilets and $31K, down from Rebirth 1 with 4.71K toilets and $5.39M. That is a
    legitimate rebirth (the multiplier is x10 now), not corruption, but it was not the
    owner's choice -- driving pads and synthetic UI clicks from the console can land
    on the rebirth confirm. Worth avoiding synthetic clicks on a save someone cares
    about, or testing on a throwaway account.
-6. **The economy has NOT been balanced end to end.** `Config.poopCount` changed what
+7. **The economy has NOT been balanced end to end.** `Config.poopCount` changed what
    the basket reads, not what anything earns, and `BUY_PRODUCTION_SECONDS` is a
    single hand-picked constant. Nobody has played a fresh save from $10 to a rebirth
    with these numbers. The knobs are INCOME_RATIO / COST_RATIO, BUY_SCALE_COEFF /
