@@ -149,6 +149,57 @@ local function setPillarsVisible(stall: Model, visible: boolean)
 	end
 end
 
+-- The map ships 4 rows of 12. Config.MAX_PLOT_SLOTS asks for more than that, so the
+-- missing rows are cloned from the top row and stacked on, keeping slot numbering
+-- column-aligned (slot + STALL_ROW is directly above) which the pillar mapping
+-- depends on. Runs before the re-seat, so the new rows are spaced like the rest.
+local function growStalls(plot: Model)
+	local stalls = plot:FindFirstChild("Stalls")
+	if not stalls then return end
+
+	local existing = {}
+	for _, s in ipairs(stalls:GetChildren()) do
+		if s:IsA("Model") and s:GetAttribute("Slot") then table.insert(existing, s) end
+	end
+	if #existing == 0 or #existing >= Config.MAX_PLOT_SLOTS then return end
+
+	table.sort(existing, function(a, b)
+		return (a:GetAttribute("Slot") :: number) < (b:GetAttribute("Slot") :: number)
+	end)
+
+	local row = Config.STALL_ROW
+	local _, _, sides = stallFrame(existing[1])
+	local height = (#sides > 0) and sides[1].Size.Y or nil
+	if not height then
+		warn(("[PlotService] cannot read a stall's height on %s -- no extra rows"):format(plot.Name))
+		return
+	end
+
+	local slot = #existing
+	while slot < Config.MAX_PLOT_SLOTS do
+		-- the stall `row` places back is the one directly below the new one
+		local below = existing[slot - row + 1]
+		if not below then break end
+		local clone = below:Clone()
+		slot += 1
+		clone.Name = string.format("Stall_%02d", slot)
+		clone:SetAttribute("Slot", slot)
+		clone:SetAttribute("AboveSlot", nil)
+		clone:SetAttribute("BelowSlot", nil)
+		-- a clone of a lower stall carries its pillars; the stacking pass rebuilds
+		-- them where they are actually needed
+		for _, c in ipairs(clone:GetChildren()) do
+			if c:IsA("BasePart") and c.Name:sub(1, 6) == "Pillar" then c:Destroy() end
+		end
+		for _, c in ipairs(clone:GetDescendants()) do
+			if c:IsA("BasePart") then c.CastShadow = false end
+		end
+		clone:PivotTo(below:GetPivot() + Vector3.new(0, height, 0))
+		clone.Parent = stalls
+		table.insert(existing, clone)
+	end
+end
+
 -- Rows flush, "which stall is above me" recorded, pillars built for anything that
 -- has an upstairs neighbour.
 local function stackStalls(plot: Model)
@@ -466,6 +517,49 @@ function PlotService.freeSlot(player: Player): number?
 end
 
 -- ── claiming ────────────────────────────────────────────────────────────
+-- the floor for the sign's height above the farm, used when a plot has no stalls
+local SIGN_HEIGHT = 40
+
+-- headshots are a web call, and the same handful of ids come back every time
+local headshots: { [number]: string } = {}
+local function headshotFor(userId: number): string?
+	if headshots[userId] then return headshots[userId] end
+	local ok, url = pcall(function()
+		return Players:GetUserThumbnailAsync(userId,
+			Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+	end)
+	if ok and type(url) == "string" then
+		headshots[userId] = url
+		return url
+	end
+	return nil
+end
+
+-- Where the farm's own sign hangs. It used to be the plot's bounding-box centre
+-- plus 30% of its height, and that box takes in the 118 stud invisible border
+-- barriers and the nine storey stall tower -- so the sign floated a hundred studs
+-- up, off in the sky rather than over anybody's farm. Anchor on the BASE's centre
+-- instead, lifted just clear of the stalls.
+local function signCFrame(plot: Model): CFrame
+	local base = plot:FindFirstChild("Base")
+	local centre = base and base:GetPivot().Position or plot:GetPivot().Position
+
+	-- High, above the stall tower: the point of this sign is telling you whose farm
+	-- you are looking at from across the hub, so it has to clear the nine storeys of
+	-- stalls rather than sit at head height where the tower hides it.
+	local top = centre.Y + SIGN_HEIGHT
+	local stalls = plot:FindFirstChild("Stalls")
+	if stalls then
+		for _, st in ipairs(stalls:GetChildren()) do
+			if st:IsA("Model") then
+				local cf, size = st:GetBoundingBox()
+				top = math.max(top, cf.Position.Y + size.Y * 0.5)
+			end
+		end
+	end
+	return CFrame.new(Vector3.new(centre.X, top + 10, centre.Z))
+end
+
 local function nameplateFor(plot: Model, player: Player?)
 	local sign = plot:FindFirstChild("OwnerSign")
 	if not sign then
@@ -474,12 +568,35 @@ local function nameplateFor(plot: Model, player: Player?)
 		sign.Size = Vector3.new(1, 1, 1)
 		sign.Transparency = 1
 		sign.Anchored = true; sign.CanCollide = false; sign.CanQuery = false
-		local cf, size = plot:GetBoundingBox()
-		sign.CFrame = CFrame.new(cf.Position + Vector3.new(0, size.Y * 0.30, 0))
+		sign.CastShadow = false
+
 		local bb = Instance.new("BillboardGui")
-		bb.Size = UDim2.fromScale(26, 5)
+		bb.Size = UDim2.fromScale(30, 6)
 		bb.AlwaysOnTop = false
 		bb.MaxDistance = 500
+
+		-- headshot on the left, name to the right of it
+		local avatar = Instance.new("ImageLabel")
+		avatar.Name = "Avatar"
+		avatar.AnchorPoint = Vector2.new(0, 0.5)
+		avatar.Position = UDim2.fromScale(0.03, 0.5)
+		-- Sized square outright rather than through a UIAspectRatioConstraint. Giving
+		-- it a zero width and asking the constraint to derive one produced a 0x0 image
+		-- on both DominantAxis settings; the billboard is a known 30x6 studs, so the
+		-- square is just 0.88 of the height scaled by that 5:1 ratio.
+		avatar.Size = UDim2.fromScale(0.88 * 6 / 30, 0.88)
+		avatar.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
+		avatar.BackgroundTransparency = 0.25
+		avatar.Visible = false
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(1, 0)
+		corner.Parent = avatar
+		local ring = Instance.new("UIStroke")
+		ring.Thickness = 3
+		ring.Color = Color3.new(0, 0, 0)
+		ring.Parent = avatar
+		avatar.Parent = bb
+
 		local lbl = Instance.new("TextLabel")
 		lbl.Name = "Label"
 		lbl.Size = UDim2.fromScale(1, 1)
@@ -490,12 +607,43 @@ local function nameplateFor(plot: Model, player: Player?)
 		local st = Instance.new("UIStroke")
 		st.Thickness = 3; st.Color = Color3.new(0, 0, 0); st.Parent = lbl
 		lbl.Parent = bb
+
 		bb.Parent = sign
 		sign.Parent = plot
 	end
+
+	sign.CFrame = signCFrame(plot)
+
 	local lbl = sign:FindFirstChild("Label", true) :: TextLabel
+	local avatar = sign:FindFirstChild("Avatar", true) :: ImageLabel?
 	lbl.Text = player and (player.DisplayName .. "'s Farm") or "Empty Farm"
 	lbl.TextColor3 = player and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(170, 170, 170)
+
+	if not avatar then return end
+	if not player then
+		avatar.Visible = false
+		avatar.Image = ""
+		-- nothing to sit beside, so the text takes the whole sign
+		lbl.Position = UDim2.fromScale(0, 0)
+		lbl.Size = UDim2.fromScale(1, 1)
+		lbl.TextXAlignment = Enum.TextXAlignment.Center
+		return
+	end
+
+	-- make room for the headshot whether or not the web call comes back
+	lbl.Position = UDim2.fromScale(0.22, 0)
+	lbl.Size = UDim2.fromScale(0.76, 1)
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+	local userId = player.UserId
+	task.spawn(function()
+		local url = headshotFor(userId)
+		-- the plot may have changed hands while the thumbnail was in flight
+		if url and avatar.Parent and ownerOf[plot] == player then
+			avatar.Image = url
+			avatar.Visible = true
+		end
+	end)
 end
 
 function PlotService.claim(player: Player): Model?
@@ -579,6 +727,7 @@ end
 function PlotService.init()
 	for _, plot in ipairs(workspace.Plots:GetChildren()) do
 		plot:SetAttribute("OwnerUserId", 0)
+		growStalls(plot)
 		stackStalls(plot)
 		for _, stall in ipairs(plot.Stalls:GetChildren()) do
 			stall:SetAttribute("Unlocked", true)   -- force setStallVisible to actually run

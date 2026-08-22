@@ -261,7 +261,9 @@ function EconomyService.rebirth(player: Player)
 
 	local plot = PlotService.plotFor(player)
 	if plot then
-		for slot = 1, 48 do PlotService.clearToilet(plot, slot) end
+		-- every stall on the plot, not a pasted 48: the ceiling moves with
+		-- Config.MAX_PLOT_SLOTS and a leftover toilet would be unreachable
+		for slot = 1, Config.MAX_PLOT_SLOTS do PlotService.clearToilet(plot, slot) end
 		local bin = plot:FindFirstChild("WorldPoops")
 		if bin then bin:ClearAllChildren() end
 	end

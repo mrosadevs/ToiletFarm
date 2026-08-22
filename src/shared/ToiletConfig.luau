@@ -482,14 +482,23 @@ function Config.collectRadius(radiusLevel: number): number
 	return Config.BASE_RADIUS + 2 * radiusLevel
 end
 
--- Every plot is built with 48 physical stalls, so that is the hard ceiling.
--- The old base of 8 was sized for the "buy the best tier you can afford" model.
--- Now that you always buy Tier 1 and climb by merging, you need a big farm early
--- or the merge-equivalent counts the Buy Tier upgrade gates on are unreachable.
-Config.MAX_PLOT_SLOTS = 48
+-- 9 rows of 12. The map ships 4 rows (48); PlotService builds the rest at boot by
+-- cloning the top row upward, so this number is the only place the ceiling lives.
+-- Raising it further means more rows of stalls, not just a bigger number.
+Config.MAX_PLOT_SLOTS = 108
+Config.STALL_ROW = 12
+
+-- 30 to start and +10 a rebirth, so the ceiling arrives exactly at the last rebirth
+-- (30 + 8 x 10 = 110, clamped to 108) rather than long before it. The upgrade and
+-- the perk are what get you there early.
+Config.BASE_PLOT_SLOTS = 30
+Config.SLOTS_PER_REBIRTH = 10
 
 function Config.plotSlots(rebirths: number, purchased: number, passSlots: number?): number
-	local n = 24 + 2 * rebirths + math.min(purchased, 12) + (passSlots or 0)
+	local n = Config.BASE_PLOT_SLOTS
+		+ Config.SLOTS_PER_REBIRTH * rebirths
+		+ math.min(purchased, 12)
+		+ (passSlots or 0)
 	return math.min(n, Config.MAX_PLOT_SLOTS)
 end
 
