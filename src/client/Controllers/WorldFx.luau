@@ -196,8 +196,17 @@ function WorldFx.bindPlotSounds()
 				local now = os.clock()
 				if now - lastFlush < FLUSH_THROTTLE then return end
 				lastFlush = now
-				-- quiet: this fires constantly on a full farm and drowns everything else
-				Audio.play("Flush", { volume = 0.25, speed = 1 + (math.random() - 0.5) * 0.2 })
+				-- Quiet AND local. A hundred-odd toilets flushing is constant, and as a
+				-- 2D sound it played at full volume wherever you stood -- drowning the
+				-- music, the footsteps and the UI, including from farms across the map.
+				-- Parented to the dropping itself it falls off with distance and is
+				-- silent well before the next island.
+				Audio.play("Flush", {
+					volume = 0.075,
+					speed = 1 + (math.random() - 0.5) * 0.2,
+					parent = poop,
+					range = 55,
+				})
 			end)
 		end
 

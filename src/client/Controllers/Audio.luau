@@ -34,6 +34,14 @@ function Audio.play(name: string, opts: any?)
 	s.Volume = (opts.volume or 1) * sfxVolume
 	s.PlaybackSpeed = opts.speed or 1
 	s.Parent = opts.parent or group
+	-- A Sound parented to a part is positional, but Roblox's default falloff carries
+	-- for hundreds of studs -- which is how a farm across the map ends up audible.
+	-- `range` sets where it becomes silent, and it is inaudible beyond that.
+	if opts.range and s.Parent and s.Parent:IsA("BasePart") then
+		s.RollOffMode = Enum.RollOffMode.InverseTapered
+		s.RollOffMinDistance = opts.minRange or 8
+		s.RollOffMaxDistance = opts.range
+	end
 	s:Play()
 	s.Ended:Connect(function() s:Destroy() end)
 	-- safety net: some ids never fire Ended if they fail to load
