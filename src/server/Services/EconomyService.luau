@@ -25,7 +25,15 @@ local EconomyService = {}
 -- cash that has finished processing and is waiting on the Collect Cash pad
 local pending: { [Player]: number } = {}
 -- the selling queue: poop deposited but not yet sold, and the cash it will become
+-- The queue is carried in three parallel figures for the same poop: its VALUE
+-- (what the maths runs on), its COUNT (what the player is shown), and the cash it
+-- will become. They drain together by the same fraction so they cannot drift.
+--
+-- The sign used to print queuePoops -- a value -- under the word "Poops", so
+-- depositing 90 poops read as 9K. That is the same value-vs-count mixup the basket
+-- and the offline modal had.
 local queuePoops: { [Player]: number } = {}
+local queueItems: { [Player]: number } = {}
 local queueCash:  { [Player]: number } = {}
 -- What the offline modal is currently offering, so Claim can't be replayed for more.
 -- `offlineClaimed` keeps the amount after a plain claim so that a DoubleOffline
@@ -40,6 +48,27 @@ end
 
 function EconomyService.queued(player: Player): (number, number)
 	return queuePoops[player] or 0, queueCash[player] or 0
+end
+
+-- How many poops are still in the queue, as the basket counts them.
+function EconomyService.queuedItems(player: Player): number
+	return queueItems[player] or 0
+end
+
+-- The drain rate in poops per second. processRate works in value, so it is
+-- converted by the queue's own value-to-count ratio; with the queue empty there is
+-- no ratio to read, so the farm's current production stands in.
+function EconomyService.processItemRate(player: Player): number
+	local rate = EconomyService.processRate(player)
+	local value = queuePoops[player] or 0
+	if value > 0 then
+		return rate * ((queueItems[player] or 0) / value)
+	end
+	local produced = DataService.poopRate(player)
+	if produced > 0 then
+		return rate * (DataService.poopItemRate(player) / produced)
+	end
+	return 0
 end
 
 -- friends in this server drive the sign's "(No Friend Boost)" line
@@ -109,6 +138,7 @@ function EconomyService.deposit(player: Player)
 
 	-- into the selling queue, not straight to cash
 	queuePoops[player] = (queuePoops[player] or 0) + value
+	queueItems[player] = (queueItems[player] or 0) + items
 	queueCash[player]  = (queueCash[player] or 0) + cash
 
 	-- `count` drives the "Deposited X Poops!" banner, `value` drives the cash maths
@@ -152,11 +182,13 @@ local function tickQueue(player: Player, dt: number)
 	local fraction = sold / remaining
 	local cash = (queueCash[player] or 0) * fraction
 	queuePoops[player] = remaining - sold
+	queueItems[player] = (queueItems[player] or 0) * (1 - fraction)
 	queueCash[player] = (queueCash[player] or 0) - cash
 	if queuePoops[player] < 0.001 then
 		-- flush the rounding dust so the queue can actually reach zero
 		cash += queueCash[player] or 0
 		queuePoops[player] = 0
+		queueItems[player] = 0
 		queueCash[player] = 0
 	end
 	pending[player] = (pending[player] or 0) + cash
@@ -171,6 +203,7 @@ function EconomyService.finishProcessing(player: Player)
 	end
 	pending[player] = (pending[player] or 0) + (queueCash[player] or 0)
 	queuePoops[player] = 0
+	queueItems[player] = 0
 	queueCash[player] = 0
 	toast(player, "Processing finished!", "reward")
 	return true
@@ -257,6 +290,7 @@ function EconomyService.rebirth(player: Player)
 	for key in pairs(Config.UPGRADES) do p.upgrades[key] = 0 end
 	pending[player] = 0
 	queuePoops[player] = 0
+	queueItems[player] = 0
 	queueCash[player] = 0
 
 	local plot = PlotService.plotFor(player)
@@ -472,12 +506,14 @@ local function restore(player: Player)
 	if not p then return end
 	pending[player]    = tonumber(p.pendingCash) or 0
 	queuePoops[player] = tonumber(p.queuePoops) or 0
+	queueItems[player] = tonumber(p.queueItems) or 0
 	queueCash[player]  = tonumber(p.queueCash) or 0
 end
 
 local function capture(player: Player, p)
 	p.pendingCash = pending[player] or 0
 	p.queuePoops  = queuePoops[player] or 0
+	p.queueItems  = queueItems[player] or 0
 	p.queueCash   = queueCash[player] or 0
 end
 
@@ -502,6 +538,7 @@ function EconomyService.init()
 		-- numbers are already captured by the time these are cleared.
 		pending[player] = nil
 		queuePoops[player] = nil
+		queueItems[player] = nil
 		queueCash[player] = nil
 		offlineOffer[player] = nil
 		offlineClaimed[player] = nil

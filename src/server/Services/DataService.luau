@@ -65,6 +65,9 @@ function DataService.default()
 		-- folds them back in through DataService.onSerialize before every save.
 		pendingCash   = 0,
 		queuePoops    = 0,
+		-- the same queue counted in poops rather than in value, so the selling sign
+		-- can quote the number the basket and the deposit banner use
+		queueItems    = 0,
 		queueCash     = 0,
 		upgrades      = upgrades,
 		perks         = perks,

@@ -289,14 +289,16 @@ end
 local function refreshSellingSign(plot: Model, player: Player)
 	local sign = plot:FindFirstChild("FlushMeterSign", true)
 	if not sign then return end
-	local queued = EconomyService.queued(player)
+	-- the COUNT, so the sign agrees with the basket and the "Deposited N Poops!"
+	-- banner rather than quoting the queue's cash value under the word Poops
+	local queued = EconomyService.queuedItems(player)
 	local friends = EconomyService.friendsInServer(player)
 	for _, d in ipairs(sign:GetDescendants()) do
 		if d:IsA("TextLabel") then
 			if d.Name == "Amount" then
 				d.Text = Format.short(queued)
 			elseif d.Name == "PerSecond" then
-				d.Text = Format.short(EconomyService.processRate(player)) .. " per second"
+				d.Text = Format.short(EconomyService.processItemRate(player)) .. " per second"
 			elseif d.Name == "FriendBoost" then
 				d.Text = friends > 0
 					and ("(+%d%% Friend Boost)"):format(math.floor(math.min(friends * Config.PROCESSING.friendBoost, Config.PROCESSING.maxFriendBoost) * 100))
