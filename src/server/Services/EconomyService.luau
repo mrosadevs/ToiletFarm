@@ -343,8 +343,44 @@ function EconomyService.upgradeBuyTier(player: Player)
 	end
 	p.cash -= cost
 	p.buyTier = tier + 1
-	DataService.push(player, { cash = p.cash, buyTier = p.buyTier })
 	toast(player, ("Buy Tier %d! Now buying %s"):format(p.buyTier, Config.displayName(p.buyTier)), "reward")
+
+	-- Buy off whatever the new tier strands.
+	--
+	-- Once you buy above a tier you can never obtain that tier again, so anything
+	-- left over that cannot reach three of a kind can never be merged and would sit
+	-- on the farm as dead weight -- holding a stall -- until a rebirth.
+	--
+	-- Merge FIRST, so only the genuine remainder is bought back: after mergeAll no
+	-- tier can have three of a kind left, so what remains below the new tier is one
+	-- or two of each and is truly stuck. A farm full of mergeable Tier 1s is left
+	-- alone, which is the difference between tidying up and confiscating a farm.
+	ToiletService.mergeAll(player)
+
+	local plot = PlotService.plotFor(player)
+	local rate = DataService.poopRateBase(player)
+	local owned = ToiletService.totalToilets(player)
+	local refund, sold = 0, 0
+	for i = #p.toilets, 1, -1 do
+		local t = p.toilets[i]
+		if (t.tier or 1) < p.buyTier then
+			-- paid back at what that toilet costs to buy right now, so this is never a
+			-- way to make money off the upgrade
+			refund += Config.buyCostFor(t.tier, owned, rate)
+			if plot then PlotService.clearToilet(plot, t.slot) end
+			table.remove(p.toilets, i)
+			sold += 1
+		end
+	end
+
+	if sold > 0 then
+		refund = math.floor(refund)
+		p.cash += refund
+		toast(player, ("Sold %d stranded toilet%s for $%s")
+			:format(sold, sold == 1 and "" or "s", Format.cash(refund)), "reward")
+	end
+
+	DataService.push(player)
 	return true
 end
 
