@@ -52,9 +52,22 @@ local function setCollisionGroup(character: Model)
 	character.DescendantAdded:Connect(apply)
 end
 
+-- Set on the server, and re-set whenever the Humanoid's own speed is reset (a
+-- respawn hands back a stock 16), so nothing has to be changed in Studio.
+local function setWalkSpeed(character: Model)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+		or character:WaitForChild("Humanoid", 10) :: Humanoid?
+	if not humanoid then return end
+	humanoid.WalkSpeed = Config.WALK_SPEED
+end
+
 Players.PlayerAdded:Connect(function(player)
-	if player.Character then task.spawn(setCollisionGroup, player.Character) end
-	player.CharacterAdded:Connect(function(char) task.spawn(setCollisionGroup, char) end)
+	local function dress(char: Model)
+		task.spawn(setCollisionGroup, char)
+		task.spawn(setWalkSpeed, char)
+	end
+	if player.Character then dress(player.Character) end
+	player.CharacterAdded:Connect(dress)
 end)
 
 -- ── join flow ───────────────────────────────────────────────────────────

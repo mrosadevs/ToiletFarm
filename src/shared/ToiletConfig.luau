@@ -24,6 +24,10 @@ Config.MAX_TIER     = 30
 -- count on a late-game plot for no gameplay difference.
 Config.DROP_INTERVAL = 3.0
 
+-- Roblox ships characters at 16. The farm is a walking game -- stall to septic tank
+-- to collect pad and back -- and 16 makes that a trudge.
+Config.WALK_SPEED = 20
+
 Config.NAMES = {
 	"PorcelainStarter", "PrimitivePit", "MossyBowl", "RustyPan", "DumpsterDeluxe",
 	"BrickThrone", "CopperComode", "SteelShrine", "PyramidToilet", "FreshFlow",
@@ -83,7 +87,12 @@ Config.BUY_SCALE_EXPONENT = 0.871
 -- Deliberately measured on the raw poop value, not on cash earned: folding in the
 -- cash multiplier would put the price up for owning the x2 gamepass, which is
 -- charging a player for buying something.
-Config.BUY_PRODUCTION_SECONDS = 300
+-- 300 throttled the farm hard enough that it never filled: every toilet cost three
+-- seconds of the WHOLE farm's output, so buying could not outrun income and the
+-- simulation sat at nine of twenty-four stalls for hours. 120 keeps a full batch of
+-- 100 costing a couple of minutes of production -- still a real purchase, not the
+-- pocket change the farm-size curve alone charges a rich player.
+Config.BUY_PRODUCTION_SECONDS = 120
 Config.BUY_PRODUCTION_BATCH   = 100
 
 function Config.buyCostFor(tier: number, totalToilets: number, poopRate: number?): number
@@ -336,15 +345,31 @@ end
 
 -- ── Rebirths ────────────────────────────────────────────────────────────────
 -- multipliers are ABSOLUTE, not cumulative
+-- Costs are SOLVED against a simulation of the loop rather than picked by eye:
+-- production, merging, the buy curve and the flush meter's weighted average (1.1375),
+-- for a player who grows the farm and then banks. The target is a ten minute first
+-- rebirth with each one after it meaningfully longer -- roughly x1.5 -- landing at
+-- about eight hours of play to reach the last one.
+--
+--   1: 10m    2: 15m    3: 23m    4: 34m
+--   5: 52m    6: 77m    7: 1.9h   8: 2.8h
+--
+-- The old table asked $300K for the first rebirth, which the same model puts at 25
+-- minutes, and $1.35e18 for the last, which is unreachable inside a day.
+--
+-- What the model does NOT include, all of which make a real player faster: the Buy
+-- Tier upgrade, the cash/value upgrades, lucky blocks, offline earnings, the group
+-- pad and the cash packs. Treat these as a ceiling on pacing, not a promise, and
+-- retune from the simulation rather than by nudging single rows.
 Config.REBIRTHS = {
-	{ cost = 300e3,   mult = 2,    tokens = 1  },
-	{ cost = 20e6,    mult = 5,    tokens = 2  },
-	{ cost = 1.25e9,  mult = 12,   tokens = 3  },
-	{ cost = 80e9,    mult = 30,   tokens = 5  },
-	{ cost = 5e12,    mult = 80,   tokens = 8  },
-	{ cost = 330e12,  mult = 220,  tokens = 12 },
-	{ cost = 20e15,   mult = 650,  tokens = 18 },
-	{ cost = 1.35e18, mult = 2000, tokens = 25 },
+	{ cost = 19e3,    mult = 2,    tokens = 1  },
+	{ cost = 400e3,   mult = 5,    tokens = 2  },
+	{ cost = 3.3e6,   mult = 12,   tokens = 3  },
+	{ cost = 19e6,    mult = 30,   tokens = 5  },
+	{ cost = 110e6,   mult = 80,   tokens = 8  },
+	{ cost = 640e6,   mult = 220,  tokens = 12 },
+	{ cost = 4.6e9,   mult = 650,  tokens = 18 },
+	{ cost = 32e9,    mult = 2000, tokens = 25 },
 }
 Config.MAX_REBIRTH = #Config.REBIRTHS
 
