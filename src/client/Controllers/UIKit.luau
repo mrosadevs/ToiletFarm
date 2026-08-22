@@ -179,6 +179,16 @@ function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
 		local s = math.min(vp.X / DESIGN.X, vp.Y / DESIGN.Y)
 		-- on very narrow screens bump it up a little or the HUD is unreadable
 		if vp.X < 700 then s *= 1.25 end
+		-- ...but never past the point where the panel swallows the screen. That
+		-- boost is what made a small window show a Lucky Block menu taller than the
+		-- viewport. Bound the scale by THIS panel's own design size so the result
+		-- always leaves a margin, whatever the panel measures.
+		if not fill then
+			local d = container:GetAttribute("DesignSize") :: Vector2?
+			if d and d.X > 0 and d.Y > 0 then
+				s = math.min(s, vp.X * 0.94 / d.X, vp.Y * 0.90 / d.Y)
+			end
+		end
 		(scale :: UIScale).Scale = s
 		if fill then
 			-- The UIScale multiplies the container's own size too, so asking for
