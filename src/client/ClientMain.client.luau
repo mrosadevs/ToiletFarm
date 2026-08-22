@@ -20,6 +20,7 @@ local Index    = require(Controllers.Index)
 local Panels   = require(Controllers.Panels)
 local Lucky    = require(Controllers.Lucky)
 local Tutorial = require(Controllers.Tutorial)
+local Freecam  = require(Controllers.Freecam)
 
 local player = Players.LocalPlayer
 
@@ -32,6 +33,8 @@ Index.init()
 Panels.init()
 Lucky.init()
 Tutorial.init()
+-- last, so its Shift+P is bound after everything that could have claimed a key
+Freecam.init()
 Screens.buildIconRow()
 WorldFx.bindPads()
 WorldFx.muteVanillaSounds()

@@ -55,12 +55,20 @@ mutation, lucky-block and prop prefabs) · Lighting · `MaterialService` variant
 | `Security/RemoteGuard` | The single door for every client-to-server call: rate limit, argument validation, dispatch. |
 | `Security/RateLimiter` | Per-player, per-action token buckets. |
 
-**Client** — `src/client`, `ClientMain.client.luau` plus eleven controllers in
+**Client** — `src/client`, `ClientMain.client.luau` plus twelve controllers in
 `Controllers/`. The controllers **bind to the Studio-authored `StarterGui`
 hierarchy**; they do not build it. `State` holds replicated profile state, `Screens`
 routes panels, `UIKit` provides interaction helpers, `Hud` / `Panels` / `Index` /
 `Lucky` / `Popups` / `Tutorial` drive individual screens, `WorldFx` and `Audio`
 handle feedback.
+
+`Freecam` is the exception to "do not build UI in code": it is a capture tool, not
+part of the game's view, so it owns the small overlay it draws. Shift+F detaches the
+camera, freezes the character and hides the HUD for filming; it touches no server
+state and cannot, so it ships enabled for everyone (`ALLOW` at the top of the file
+takes UserIds if that ever needs narrowing). It deliberately avoids Shift+P, which
+is Studio's own injected freecam — that one exists only in playtests, never in a
+published client.
 
 **Shared** — `src/shared`: `ToiletConfig` (the content and tuning tables, 497 lines
 and the single source of game balance), `Net` (remote definitions and canonical
