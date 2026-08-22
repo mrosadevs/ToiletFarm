@@ -252,32 +252,36 @@ local function refreshPad(pad: Model, player: Player)
 		-- floated high above the septic area where it read as a stray label
 	end
 
-	-- Robux-priced pads: the hologram number comes from the live product price,
-	-- never from the mockup value baked into the model.
-	local robux = ROBUX_PADS[kind]
-	if robux then
-		local isPass = robux.kind == "pass"
-		-- the buyer price, not GetProductInfo's creator-set value
-		local robuxPrice = isPass
-			and Prices.pass(robux.id)
-			or Prices.product(robux.id)
-		local exists = isPass
-			and PassService.passId(robux.id) ~= 0
-			or PassService.productId(robux.id) ~= 0
+end
 
-		if quantity then
-			local owned = isPass and PassService.has(player, robux.id)
-			quantity.Text = owned and (robux.label .. " ✓") or robux.label
+-- A Robux price is the same number for everybody, so these pads are refreshed on
+-- EVERY plot rather than only the one its owner is standing on. refreshPad runs for
+-- the owner alone, which left every unclaimed farm advertising the mockup figures
+-- baked into the models -- 64 for Auto Collect Poops, 24 for Auto Collect Cash,
+-- 16 for Instant Poop Process, against real prices of 67, 25 and 15.
+local function refreshRobuxPad(pad: Model, owner: Player?)
+	local robux = ROBUX_PADS[pad:GetAttribute("PadKind")]
+	if not robux then return end
+	local quantity, price = labels(pad)
+	local isPass = robux.kind == "pass"
+	-- the buyer price, not GetProductInfo's creator-set value
+	local robuxPrice = isPass and Prices.pass(robux.id) or Prices.product(robux.id)
+	local exists = isPass
+		and PassService.passId(robux.id) ~= 0
+		or PassService.productId(robux.id) ~= 0
+
+	if quantity then
+		local owned = isPass and owner ~= nil and PassService.has(owner, robux.id)
+		quantity.Text = owned and (robux.label .. " ✓") or robux.label
+	end
+	if price then
+		if robuxPrice then
+			price.Text = tostring(robuxPrice)
+		elseif not exists then
+			price.Text = "soon"
 		end
-		if price then
-			if robuxPrice then
-				price.Text = tostring(robuxPrice)
-			elseif not exists then
-				price.Text = "soon"
-			end
-			-- if the product exists but the async price hasn't landed yet, leave the
-			-- label as-is rather than flashing a wrong number
-		end
+		-- if the product exists but the async price hasn't landed yet, leave the
+		-- label as-is rather than flashing a wrong number
 	end
 end
 
@@ -654,6 +658,22 @@ function PadService.init()
 					end
 				end
 			end
+		end
+	end)
+
+	-- Robux pads on every plot, owned or not. Slower than the owner loop because
+	-- nothing on them changes except the ✓ when a pass is bought.
+	task.spawn(function()
+		while true do
+			for _, plot in ipairs(workspace.Plots:GetChildren()) do
+				local owner = PlotService.ownerOfPlot(plot)
+				for _, d in ipairs(plot:GetDescendants()) do
+					if d:IsA("Model") and ROBUX_PADS[d:GetAttribute("PadKind")] then
+						pcall(refreshRobuxPad, d, owner)
+					end
+				end
+			end
+			task.wait(2)
 		end
 	end)
 
