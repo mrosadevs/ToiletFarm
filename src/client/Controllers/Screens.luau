@@ -5,6 +5,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local GuiService = game:GetService("GuiService")
+local SocialService = game:GetService("SocialService")
 
 local UIKit = require(script.Parent.UIKit)
 local Audio = require(script.Parent.Audio)
@@ -99,11 +100,42 @@ end
 -- Codes, Settings, Profile -- and nothing else. Index has its own button down the
 -- right-hand side of the HUD, and the Shop icon only ever raised a "coming soon"
 -- toast; buying cash is the + beside the balance now.
+-- `invite` raises Roblox's own invite-a-friend dialog instead of one of our panels,
+-- so every entry carries both fields and the shape stays uniform.
 local ICONS = {
-	{ name = "Codes",    screen = "RedeemCodesScreen", image = "rbxassetid://94059211188461"  },
-	{ name = "Settings", screen = "SettingsScreen",    image = "rbxassetid://77358150753910"  },
-	{ name = "Profile",  screen = "ProfileScreen",     image = "rbxassetid://118735441671958" },
+	{ name = "Codes",    screen = "RedeemCodesScreen", image = "rbxassetid://94059211188461",  invite = false },
+	{ name = "Settings", screen = "SettingsScreen",    image = "rbxassetid://77358150753910",  invite = false },
+	{ name = "Profile",  screen = "ProfileScreen",     image = "rbxassetid://118735441671958", invite = false },
+	{ name = "Invite",   screen = "",                  image = "rbxassetid://132819889079323", invite = true  },
 }
+
+-- CanSendGameInviteAsync is a web call, so it is asked on the click that needs the
+-- answer and never on a loop, and the button is latched shut while it is in flight
+-- so a second click cannot stack a second request.
+local invitePending = false
+
+local function promptInvite()
+	if invitePending then return end
+	invitePending = true
+	task.spawn(function()
+		local ok, can = pcall(function()
+			return SocialService:CanSendGameInviteAsync(player)
+		end)
+		if not ok then
+			warn("[Screens] invite check failed: " .. tostring(can))
+		elseif can then
+			local sent, err = pcall(function()
+				-- PromptMessage is the only option here that needs no Creator
+				-- Dashboard setup; InviteMessageId would need a notification asset.
+				local opts = Instance.new("ExperienceInviteOptions")
+				opts.PromptMessage = "Come run a toilet farm with me!"
+				SocialService:PromptGameInvite(player, opts)
+			end)
+			if not sent then warn("[Screens] invite prompt failed: " .. tostring(err)) end
+		end
+		invitePending = false
+	end)
+end
 
 -- All three as a share of the top bar's height, because that height is what changes
 -- between devices. Measured off a 1:1 screenshot of the real bar: on a 58px bar
@@ -139,7 +171,7 @@ function Screens.buildIconRow()
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
 	-- Explicit, and every button gets a LayoutOrder below. With all of them left on
 	-- 0 the layout falls back to sorting by NAME, which quietly ordered the row
-	-- Codes / Profile / Settings -- alphabetical, not the order declared.
+	-- Codes / Invite / Profile / Settings -- alphabetical, not the order declared.
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = row
 
@@ -173,7 +205,11 @@ function Screens.buildIconRow()
 
 		UIKit.makeInteractive(btn, function()
 			Audio.play("UiClick")
-			Screens.toggle(def.screen)
+			if def.invite then
+				promptInvite()
+			else
+				Screens.toggle(def.screen)
+			end
 		end, {
 			hover = 1.15,
 			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
