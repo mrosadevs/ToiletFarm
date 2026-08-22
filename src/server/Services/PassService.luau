@@ -60,12 +60,19 @@ function PassService.has(player: Player, passName: string): boolean
 	local byUser = cache[player.UserId]
 	if byUser and byUser[passName] ~= nil then return byUser[passName] end
 
-	local owns = false
 	local ok, res = pcall(function()
 		return MarketplaceService:UserOwnsGamePassAsync(player.UserId, id)
 	end)
-	if ok then owns = res end
+	if not ok then
+		-- A THROWN query is not an answer. This used to cache the false, so one
+		-- hiccup at join -- and this call throws readily right after a server starts --
+		-- disabled every pass the player owned for the rest of the session, with no way
+		-- back short of rejoining. Report not-owned for now and ask again next time.
+		warn(("[PassService] ownership check for %s failed: %s"):format(passName, tostring(res)))
+		return false
+	end
 
+	local owns = res == true
 	cache[player.UserId] = byUser or {}
 	cache[player.UserId][passName] = owns
 	return owns
@@ -215,8 +222,18 @@ function PassService.init()
 		for name, id in pairs(PassService.PASSES) do
 			if id == passId then
 				print(("[PassService] %s bought %s"):format(player.Name, name))
+				-- Auto Collect is the whole product: switch it on rather than leaving the
+				-- buyer to find a toggle in Settings before their purchase does anything.
+				local profile = DataService and DataService.get(player)
+				if profile then
+					if name == "AutoFlush" then profile.settings.AutoPoop = true end
+					if name == "AutoCash" then profile.settings.AutoCash = true end
+				end
 			end
 		end
+		-- full push: `passes` only rides a full state push, so without this the HUD goes
+		-- on advertising a pass the player just bought until they rejoin
+		if DataService then DataService.push(player) end
 	end)
 
 	-- Roblox retries a receipt until it is told PurchaseGranted, and it may retry one

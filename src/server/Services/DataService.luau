@@ -75,7 +75,10 @@ function DataService.default()
 		-- Trimmed to the newest RECEIPT_HISTORY entries; Roblox stops retrying long
 		-- before a player could push that many purchases through.
 		receipts      = {},
-		settings      = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = false, AutoCash = false },
+		-- AutoPoop/AutoCash default ON. They do nothing without the matching gamepass,
+		-- so the toggle is an opt-out for owners rather than a second thing to find
+		-- before a purchase starts working.
+		settings      = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = true, AutoCash = true },
 		stats         = { playtime = 0, totalDeposited = 0, bestCash = 0 },
 		tutorial      = 1,      -- current step index; 0 once finished
 		-- os.time() of the last free-money chest claim. Persisted because an
@@ -113,6 +116,26 @@ local function reconcile(saved, template)
 		end
 	end
 	return saved
+end
+
+-- Fix-ups a saved profile needs that `reconcile` cannot do, because reconcile only
+-- fills in keys that are MISSING and these are keys with the wrong value saved.
+-- `schema` is deliberately NOT in the default template. reconcile() fills in every
+-- key the template has and missing keys are exactly how an un-migrated profile is
+-- recognised, so putting it there stamped every old save as already migrated before
+-- this function ever saw it.
+local function migrate(p)
+	local from = tonumber(p.schema) or 1
+	if from < 2 then
+		-- Auto Collect was gated behind a setting that defaulted to false, so the pass
+		-- did nothing at all until the buyer found the switch. Anyone who saved before
+		-- this has `false` on disk; nobody can have meant it, because the toggle had no
+		-- effect to opt out of.
+		p.settings.AutoPoop = true
+		p.settings.AutoCash = true
+	end
+	p.schema = 2
+	return p
 end
 
 local function key(player: Player): string
@@ -332,7 +355,7 @@ local function loadProfile(player: Player): any
 		return nil
 	end
 
-	local profile = reconcile(data or {}, DataService.default())
+	local profile = migrate(reconcile(data or {}, DataService.default()))
 	profiles[player] = profile
 	loading[player] = nil
 	return profile
