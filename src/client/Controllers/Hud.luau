@@ -25,6 +25,8 @@ local PRODUCT_IDS = { 3708565222, 3708565345, 3708565384 }
 local PASS_DOUBLE_CASH = 1948365646
 -- must match the "if hasPass DoubleCash then m *= 2" in DataService.cashMultiplier
 local DOUBLE_CASH_MULT = 2
+-- clear space between the balance pill, the + button and the line beside it
+local CASH_ROW_GAP = 12
 
 local player = Players.LocalPlayer
 local gui = player:WaitForChild("PlayerGui")
@@ -134,9 +136,14 @@ local function refresh(data: any, changed: any)
 	local robux = find("RobuxAmount") :: TextLabel?
 	if robux then robux.Text = Prices.text("pass", "DoubleCash") end
 
-	-- the small line by the cash bar: what you actually earn right now
+	-- The line beside the + button advertises what that button hands over -- the
+	-- smallest cash pack, scaled to the balance like the chips down the left edge.
+	-- It used to show the income multiplier, which read as a label for the + button
+	-- and described something else entirely.
 	local multText = find("CashMultiplierText") :: TextLabel?
-	if multText then multText.Text = ("x%s Cash"):format(Format.short(data.multiplier or 1)) end
+	if multText then
+		multText.Text = "+" .. Format.cash(Config.cashPackAmount(data.cash, 1)) .. "$"
+	end
 
 	-- The green PERMANENT badge is a storefront for the x2 Cash gamepass, so it has
 	-- to advertise what you would GET. Writing the player's current multiplier here
@@ -205,12 +212,35 @@ function Hud.init()
 			Net.event(Net.NAMES.TeleportHome):FireServer()
 		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
 	end
+	-- The + by the balance is a buy-cash button, so it goes straight to the smallest
+	-- pack rather than opening a shop to pick from.
 	local addCash = C:FindFirstChild("AddCashButton")
 	if addCash and addCash:IsA("GuiObject") then
 		UIKit.makeInteractive(addCash, function()
 			Audio.play("UiClick")
-			Screens.openShop()
+			local id = PRODUCT_IDS[1]
+			if not id or id == 0 then
+				require(script.Parent.Popups).toast("Coming soon!", "error")
+				return
+			end
+			MarketplaceService:PromptProductPurchase(player, id)
 		end, { hover = 1.15 })
+	end
+
+	-- The + button is authored overlapping the balance pill (the bar ends at 277,
+	-- the button starts at 265) and the line beside it sits tight against both.
+	-- Slide the pair right so the row reads as three separate things.
+	local bar = C:FindFirstChild("CashBar")
+	local multLine = C:FindFirstChild("CashMultiplierText")
+	if bar and bar:IsA("GuiObject") and addCash and addCash:IsA("GuiObject") then
+		local barRight = bar.Position.X.Offset + bar.Size.X.Offset
+		local delta = (barRight + CASH_ROW_GAP) - addCash.Position.X.Offset
+		if delta > 0 then
+			addCash.Position += UDim2.fromOffset(delta, 0)
+			if multLine and multLine:IsA("GuiObject") then
+				multLine.Position += UDim2.fromOffset(delta, 0)
+			end
+		end
 	end
 	-- the 2x Cash badge sells the x2 Cash gamepass
 	local badge = C:FindFirstChild("CashMultiplierBadge")
