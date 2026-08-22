@@ -37,6 +37,7 @@ WorldFx.bindPads()
 WorldFx.muteVanillaSounds()
 WorldFx.bindFootsteps()
 WorldFx.bindPlotSounds()
+WorldFx.buildFlushHologram()
 WorldFx.bindVfx()
 
 -- the discovery ScreenGui is a popup we drive directly, not a panel
