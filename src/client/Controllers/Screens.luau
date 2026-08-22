@@ -109,32 +109,43 @@ local ICONS = {
 	{ name = "Invite",   screen = "",                  image = "rbxassetid://132819889079323", invite = true  },
 }
 
--- CanSendGameInviteAsync is a web call, so it is asked on the click that needs the
--- answer and never on a loop, and the button is latched shut while it is in flight
--- so a second click cannot stack a second request.
-local invitePending = false
+-- CanSendGameInviteAsync is a web call, and asking it on the click is what made the
+-- button sit dead for a beat before anything appeared. It is asked once at startup
+-- instead, so by the time anyone clicks the answer is already in hand and the click
+-- does nothing but raise the dialog.
+--
+-- nil means the answer has not landed yet, and that case prompts anyway: an
+-- optimistic prompt that fails is a no-op inside the pcall, where making the player
+-- wait out a round trip is the thing being fixed.
+local canInvite: boolean? = nil
 
-local function promptInvite()
-	if invitePending then return end
-	invitePending = true
+local function warmInvite()
 	task.spawn(function()
 		local ok, can = pcall(function()
 			return SocialService:CanSendGameInviteAsync(player)
 		end)
 		if not ok then
 			warn("[Screens] invite check failed: " .. tostring(can))
-		elseif can then
-			local sent, err = pcall(function()
-				-- PromptMessage is the only option here that needs no Creator
-				-- Dashboard setup; InviteMessageId would need a notification asset.
-				local opts = Instance.new("ExperienceInviteOptions")
-				opts.PromptMessage = "Come run a toilet farm with me!"
-				SocialService:PromptGameInvite(player, opts)
-			end)
-			if not sent then warn("[Screens] invite prompt failed: " .. tostring(err)) end
 		end
-		invitePending = false
+		-- written out rather than `ok and can or false`, which reads as the same
+		-- thing and is not
+		if ok and can == true then
+			canInvite = true
+		else
+			canInvite = false
+		end
 	end)
+end
+
+local function promptInvite()
+	if canInvite == false then return end
+	-- Roblox's own dialog, called bare. Passing ExperienceInviteOptions to set a
+	-- custom PromptMessage is what produced the older-looking prompt; with no
+	-- options attached the client shows its current default invite UI.
+	local ok, err = pcall(function()
+		SocialService:PromptGameInvite(player)
+	end)
+	if not ok then warn("[Screens] invite prompt failed: " .. tostring(err)) end
 end
 
 -- All three as a share of the top bar's height, because that height is what changes
@@ -241,6 +252,8 @@ function Screens.buildIconRow()
 
 	relayout()
 	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(relayout)
+	-- asked now so the first click on the invite chip is instant
+	warmInvite()
 	return screen
 end
 

@@ -125,9 +125,12 @@ reference screenshot.
 - **The buyback has never fired on a live upgrade.** The save is 5.09K of the 15K
   toilets the next tier needs and closing that gap costs billions. The rule is
   verified, the wiring is not.
-- **The invite prompt has never been seen open.** `CanSendGameInviteAsync` returns
-  false in a Studio playtest, so the button is inert in Studio by design. Needs a
-  live client.
+- **The invite prompt has never been seen open, and cannot be from here.** It is
+  CoreGui, which Studio's screen capture does not render, so its appearance can only
+  be judged in a live client. (Correcting an earlier note in this entry:
+  `CanSendGameInviteAsync` does **not** always return false in Studio — it returned
+  false on one playtest and true on the next, taking 101ms. The button is not inert
+  in Studio by design; the first result was a timing artefact.)
 - **Freecam gamepad support is untested**, as is the whole thing in a published
   client — both playtests were Studio.
 - **The place still needs saving by the owner** for the `Workspace.Vfx` deletion,
