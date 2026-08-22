@@ -192,6 +192,40 @@ through and everything below was then playtested in Studio.
   the HUD move from earlier in the session; the trade is unchanged and real -- a
   billboard shrinks with distance, so it cannot also be read from a farm.
 
+### Farm size, pad overlap and the partner's two bugs
+
+- **Group reward pulled up the rebirth UI** (`25b7b52`), reported by the partner, who
+  correctly guessed there was an old button underneath. It was my doing: Plot1's
+  rebirth pad is the one the owner renamed into a group pad, and last session's
+  re-seating took its reference as "whichever group pad is nearest its own plot" --
+  so every other farm got a group pad dropped exactly on its rebirth pad. The rebirth
+  pad anchors the placement now and the group pad sits 12 studs off it. Plot1 also
+  gets a rebirth pad back, cloned from the plot template; the rename had left that
+  farm unable to rebirth from the world at all.
+- **Panels swallowed small screens** (`4495e80`). The narrow-screen readability boost
+  (x1.25 under 700px wide) pushed a 760-tall panel past the height it was being
+  fitted into. The scale is now also bounded by the panel's own design size.
+- **Merge burst moved onto the merge pad** (`41f1de0`) -- at the player's feet it went
+  off wherever they had walked to, and Auto Merge fires from anywhere on the farm.
+- **108 stalls: 30 base, +10 a rebirth** (`f5a2a08`). The map ships 48 per plot, so
+  PlotService now clones the top row upward at boot to build five more rows of twelve.
+  Slot numbering stays column-aligned, which the pillar mapping depends on. The
+  ceiling arrives exactly at the eighth rebirth. **One plot's stall geometry goes from
+  ~360 parts to 963, about 5,800 across six farms** -- generated parts have CastShadow
+  off, but this is the biggest single addition to the world so far and is worth
+  watching if performance complaints appear.
+- **Farm nameplates** (same commit, which therefore carries two concerns): they were
+  placed from the plot bounding box, which takes in the 118 stud border barriers and
+  the new tower, so they hung ~100 studs up and off to one side. Centred on the base
+  and lifted clear of the stalls now, with the owner's cached headshot beside the
+  name.
+
+Two traps worth not re-learning: a `UIAspectRatioConstraint` given a zero width
+produces a 0x0 image on BOTH DominantAxis settings -- size the square outright. And
+`AbsoluteSize` on a BillboardGui's children reads 0 whenever the billboard is not
+being drawn, so always measure a known-good sibling as a control before concluding
+something is collapsed.
+
 ### Economy pass
 
 The owner set the target: a ten minute first rebirth, each one after it
