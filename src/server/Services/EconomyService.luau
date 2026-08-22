@@ -575,7 +575,12 @@ function EconomyService.init()
 		while true do
 			task.wait(2)
 			for _, player in ipairs(Players:GetPlayers()) do
-				if (pending[player] or 0) > 0 and PassService.has(player, "AutoCash") then
+				-- The SETTING as well as the pass. This checked ownership alone, so the
+				-- Settings toggle did nothing and cash kept collecting itself however it
+				-- was set -- the poop loop had always checked both.
+				local p = DataService.get(player)
+				local wants = p ~= nil and p.settings.AutoCash == true
+				if (pending[player] or 0) > 0 and wants and PassService.has(player, "AutoCash") then
 					EconomyService.collectCash(player)
 				end
 			end
