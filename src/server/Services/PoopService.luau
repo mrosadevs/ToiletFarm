@@ -631,7 +631,11 @@ function PoopService.collect(player: Player, poops: { BasePart }, animate: boole
 	local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local payload = table.create(#taken)
 	for _, e in ipairs(taken) do
-		table.insert(payload, { pos = e.part.Position, value = e.value, count = e.count })
+		table.insert(payload, {
+			pos = e.part.Position, value = e.value, count = e.count,
+			-- drives which gradient the floating number comes up in
+			tier = e.part:GetAttribute("Tier"),
+		})
 		if animate and hrp then
 			flyIntoPlayer(e.part, hrp)
 		else

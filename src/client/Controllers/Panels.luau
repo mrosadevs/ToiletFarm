@@ -390,7 +390,12 @@ local function initWelcomeBack()
 			or double:FindFirstChild("Price", true) :: TextLabel?
 		local shown = Prices.product("DoubleOffline")
 		if priceLabel and shown then priceLabel.Text = tostring(shown) end
-		if tag then tag.Text = "x2 Poops!" end
+		if tag then
+			tag.Text = "x2 Poops!"
+			-- applied here as well as on the report: the label is bound long before
+			-- an offline report ever arrives, and without this it sat plain until one did
+			UIKit.gradient(tag, UIKit.RAINBOW, 0)
+		end
 	end
 
 	Net.event(Net.NAMES.OfflineReport).OnClientEvent:Connect(function(payload)
@@ -416,6 +421,7 @@ local function initWelcomeBack()
 		local doubleTag = panel:FindFirstChild("DoubleTag", true) :: TextLabel?
 		if doubleTag then
 			doubleTag.Text = ("x2 = %s Poops!"):format(Format.short(payload.poops * 2))
+			UIKit.gradient(doubleTag, UIKit.RAINBOW, 0)
 		end
 		Screens.open("WelcomeBackScreen")
 	end)

@@ -51,12 +51,31 @@ Popups.outlined = outlined
 -- reference game stacks its +1 / +25 / +90 chips.
 local BASKET_ANCHOR = UDim2.fromScale(0.5, 0.80)
 
-function Popups.poopGain(amount: number, big: boolean?)
+-- One gradient per tier, cycled, so a heap of mixed droppings comes up in mixed
+-- colours instead of a column of identical white numbers. Keyed to the tier rather
+-- than random, so the same toilet always reads the same way.
+local GAIN_GRADIENTS = {
+	ColorSequence.new(Color3.fromRGB(255, 245, 170), Color3.fromRGB(255, 170,  40)),
+	ColorSequence.new(Color3.fromRGB(180, 255, 190), Color3.fromRGB( 40, 200,  90)),
+	ColorSequence.new(Color3.fromRGB(180, 235, 255), Color3.fromRGB( 40, 150, 255)),
+	ColorSequence.new(Color3.fromRGB(255, 200, 235), Color3.fromRGB(230,  70, 180)),
+	ColorSequence.new(Color3.fromRGB(225, 200, 255), Color3.fromRGB(140,  70, 240)),
+	ColorSequence.new(Color3.fromRGB(255, 210, 175), Color3.fromRGB(240, 110,  50)),
+}
+
+function Popups.poopGain(amount: number, big: boolean?, tier: number?)
 	if not layer then return end
-	local size = big and 54 or 38
-	local l = outlined("+" .. Format.short(amount), size,
-		big and Color3.fromRGB(255, 215, 60) or Color3.fromRGB(245, 245, 245))
-	l.Size = UDim2.fromOffset(260, size + 14)
+	local size = big and 66 or 48
+	local l = outlined("+" .. Format.short(amount), size, Color3.new(1, 1, 1))
+	-- Rainbow is reserved for a genuinely rare dropping. Keying it off cash value
+	-- meant every pickup on a grown farm cleared the threshold and came up rainbow,
+	-- which is exactly the sameness the per-tier colours are here to break.
+	if big then
+		UIKit.gradient(l, UIKit.RAINBOW, 0)
+	else
+		UIKit.gradient(l, GAIN_GRADIENTS[((tier or 1) - 1) % #GAIN_GRADIENTS + 1], 90)
+	end
+	l.Size = UDim2.fromOffset(300, size + 14)
 	l.AnchorPoint = Vector2.new(0.5, 0.5)
 	local jitterX = (math.random() - 0.5) * 0.16
 	l.Position = BASKET_ANCHOR + UDim2.fromScale(jitterX, 0)
@@ -81,11 +100,12 @@ end
 function Popups.poopBurst(entries: { any })
 	task.spawn(function()
 		for i, e in ipairs(entries) do
-			-- Exactly what the basket gained: a Tier 8 dropping is +8, a Tier 1 is +1.
-			-- This used to print the poop's cash VALUE, so a single poop worth 19 flashed
-			-- "+19" while the basket moved by one. The value still decides whether it gets
-			-- the big gold treatment.
-			Popups.poopGain(e.count or 1, e.value >= 1000)
+			-- Exactly what the basket gained. This used to print the poop's cash VALUE,
+			-- so a single poop worth 19 flashed "+19" while the basket moved by one.
+			-- The value still decides whether it gets the big rainbow treatment.
+			-- the rarity band decides the rainbow, not the cash value
+			local rare = e.tier ~= nil and Config.rarityOf(e.tier) or "Common"
+			Popups.poopGain(e.count or 1, rare == "Mythic" or rare == "Divine", e.tier)
 			Audio.playVaried("PoopPlop", 0.15)
 			if i % 3 == 0 then task.wait(0.05) end
 		end
