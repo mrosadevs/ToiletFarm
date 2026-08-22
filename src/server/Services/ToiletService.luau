@@ -296,8 +296,19 @@ function ToiletService.mergeAll(player: Player)
 		compactSlots(player)
 		DataService.push(player)
 		MergeResult:FireClient(player, highest, total)
-		-- server-side so anyone standing on the farm sees the merge, not just the owner
-		require(script.Parent.VfxService).playAt(player, "merge", Vector3.new(0, -1.5, 0))
+		-- On the PAD, not on the player. Merging is triggered by walking over the pad
+		-- and the player keeps walking, so a burst placed at their feet went off
+		-- wherever they had got to by the time it fired -- and auto-merge fires with
+		-- the player anywhere on the farm at all.
+		local Vfx = require(script.Parent.VfxService)
+		local plot = PlotService.plotFor(player)
+		local pad = plot and PlotService.padOf(plot, "MergePad")
+		local plate = pad and (pad:FindFirstChild("Plate") or pad:FindFirstChild("Part"))
+		if plate and plate:IsA("BasePart") then
+			Vfx.play("merge", plate.Position + Vector3.new(0, 3, 0))
+		else
+			Vfx.playAt(player, "merge", Vector3.new(0, -1.5, 0))
+		end
 	else
 		toast(player, "Nothing to merge — you need 3 of a kind.", "error")
 	end
