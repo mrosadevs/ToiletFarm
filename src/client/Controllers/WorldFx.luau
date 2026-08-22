@@ -304,7 +304,7 @@ local function hologramAnchor(): CFrame
 			-- lower and whichever board is nearest the camera cuts across the bar --
 			-- while staying low enough that the HUD's own Home button does not clip
 			-- the title from the hub floor, which is where it is meant to be read.
-			return CFrame.new(centre.X, highest + 12, centre.Z)
+			return CFrame.new(centre.X, highest + 16, centre.Z)
 		end
 	end
 	local centre = workspace:FindFirstChild("Center")
@@ -343,9 +343,18 @@ function WorldFx.buildFlushHologram()
 	-- of the reference game's Egg Multiplier -- a title line over a long thin scale.
 	board.Size = UDim2.fromScale(92, 22)
 	board.StudsOffsetWorldSpace = Vector3.new(0, 0, 0)
-	-- Range cut to the hub: the reference game's multiplier is likewise absent from
-	-- its own farm screenshots and only appears once you are standing in the middle.
-	board.MaxDistance = 170
+	-- No practical range limit. At 170 the widget switched off the moment the camera
+	-- got further away than that -- which is most of the hub once you zoom out, and
+	-- is why it seemed to need "a certain angle or zoom" to appear. Occlusion is the
+	-- smaller half of that complaint: measured over 144 viewpoints around the hub,
+	-- only about one in ten is blocked, essentially all of them standing directly
+	-- behind a leaderboard.
+	--
+	-- AlwaysOnTop would clear that last tenth and CANNOT be used: it renders this
+	-- billboard as nothing at all. Verified three ways -- stud-sized, pixel-sized,
+	-- and with the anchor part made barely-visible in case a fully transparent
+	-- adornee was being culled out of the always-on-top pass. All three drew nothing.
+	board.MaxDistance = 1200
 	board.LightInfluence = 0
 	-- Must stay false. A BillboardGui sized in SCALE renders NOTHING at all with
 	-- AlwaysOnTop on -- that mode wants an Offset size -- so the whole widget simply
