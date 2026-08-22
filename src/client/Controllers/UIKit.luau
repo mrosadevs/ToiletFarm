@@ -329,46 +329,53 @@ end
 function UIKit.flash(target: GuiObject)
 	local face = target:FindFirstChild("Face") or target
 	if not face:IsA("GuiObject") then face = target end
-	-- The sheen is a rotated bar taller and wider than the button, swept across it.
-	-- Parented straight onto the face it spills out over everything around the
-	-- button, because panels deliberately do not clip (that is what stops the close
-	-- button being cut off). So it goes in a mask of exactly the button's size that
-	-- DOES clip, carrying the same rounded corner, and the sweep is trimmed to the
-	-- button's own shape.
-	local mask = Instance.new("Frame")
-	mask.Name = "__FlashMask"
-	mask.BackgroundTransparency = 1
-	mask.BorderSizePixel = 0
-	mask.Size = UDim2.fromScale(1, 1)
-	mask.ClipsDescendants = true
-	mask.ZIndex = 40
-
+	-- The sweep is a bar that has to travel from off one edge to off the other, so
+	-- the thing that keeps it inside the button is the whole problem.
+	--
+	-- A clipping mask was tried and cannot work here, twice over: ClipsDescendants
+	-- does not clip a ROTATED descendant at all, and the bar was rotated 14 degrees
+	-- to get the diagonal; and even square-on it clips to a RECTANGLE, ignoring
+	-- UICorner, so it would still spill past every rounded corner and all the way
+	-- around a circular one like the top-bar chips.
+	--
+	-- So nothing moves and nothing is clipped. The sheen is a frame the exact size
+	-- and shape of the button, and what travels is a gradient inside it: the band
+	-- is painted by a transparency ramp, and sweeping the gradient's offset walks
+	-- it across. The diagonal comes from the gradient's rotation, which tilts the
+	-- fill without tilting the frame. It cannot leave the button because it is not
+	-- a separate object -- it is the button's own shape being painted.
 	local shine = Instance.new("Frame")
 	shine.Name = "__Flash"
 	shine.BackgroundColor3 = Color3.new(1, 1, 1)
-	shine.BackgroundTransparency = 0.45
+	shine.BackgroundTransparency = 0
 	shine.BorderSizePixel = 0
-	shine.Size = UDim2.new(0.35, 0, 1.6, 0)
-	shine.Position = UDim2.new(-0.4, 0, -0.3, 0)
-	shine.Rotation = 14
+	shine.Size = UDim2.fromScale(1, 1)
 	shine.ZIndex = 40
+
 	local corner = (face :: any):FindFirstChildOfClass("UICorner")
 	if corner then
 		local c = Instance.new("UICorner")
 		c.CornerRadius = corner.CornerRadius
 		c.Parent = shine
 	end
-	if corner then
-		local mc = Instance.new("UICorner")
-		mc.CornerRadius = corner.CornerRadius
-		mc.Parent = mask
-	end
-	mask.Parent = face
-	shine.Parent = mask
-	local t = TweenService:Create(shine, TweenInfo.new(0.35, Enum.EasingStyle.Quad),
-		{ Position = UDim2.new(1.1, 0, -0.3, 0), BackgroundTransparency = 1 })
+
+	local grad = Instance.new("UIGradient")
+	grad.Rotation = 20
+	grad.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0.00, 1),
+		NumberSequenceKeypoint.new(0.38, 1),
+		NumberSequenceKeypoint.new(0.50, 0.45),
+		NumberSequenceKeypoint.new(0.62, 1),
+		NumberSequenceKeypoint.new(1.00, 1),
+	})
+	grad.Offset = Vector2.new(-1, 0)
+	grad.Parent = shine
+	shine.Parent = face
+
+	local t = TweenService:Create(grad, TweenInfo.new(0.35, Enum.EasingStyle.Quad),
+		{ Offset = Vector2.new(1, 0) })
 	t:Play()
-	t.Completed:Connect(function() mask:Destroy() end)
+	t.Completed:Connect(function() shine:Destroy() end)
 end
 
 -- panels bounce in from small, and pop out on close
