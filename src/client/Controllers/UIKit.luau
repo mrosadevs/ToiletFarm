@@ -72,6 +72,33 @@ end
 
 -- `fill` widens the container to cover the whole viewport (the always-on HUD, whose
 -- children belong on the screen edges). Panels leave it off and stay centred.
+local MARGIN_CLOSE = 6
+
+-- The Figma export hangs every panel's close button over the top-right corner --
+-- measured on the Index at 4px past the right edge and 3px above the top. Clipping
+-- it off is not the answer (that is the bug this replaced), so the button is moved
+-- back inside the panel instead. Idempotent: a button already inside is not moved.
+function UIKit.tuckCloseButton(container: GuiObject)
+	local close = container:FindFirstChild("CloseButton", true)
+	if not close or not close:IsA("GuiObject") then return end
+	local panel = close.Parent
+	if not panel or not panel:IsA("GuiObject") then return end
+
+	local pw, ph = panel.Size.X.Offset, panel.Size.Y.Offset
+	local w, h = close.Size.X.Offset, close.Size.Y.Offset
+	if pw <= 0 or ph <= 0 or w <= 0 or h <= 0 then return end
+	if w + MARGIN_CLOSE * 2 > pw or h + MARGIN_CLOSE * 2 > ph then return end
+
+	-- resolve to the button's top-left, clamp, then put the anchor point back
+	local ax, ay = close.AnchorPoint.X, close.AnchorPoint.Y
+	local left = close.Position.X.Scale * pw + close.Position.X.Offset - ax * w
+	local top = close.Position.Y.Scale * ph + close.Position.Y.Offset - ay * h
+	local nl = math.clamp(left, MARGIN_CLOSE, pw - w - MARGIN_CLOSE)
+	local nt = math.clamp(top, MARGIN_CLOSE, ph - h - MARGIN_CLOSE)
+	if math.abs(nl - left) < 0.5 and math.abs(nt - top) < 0.5 then return end
+	close.Position = UDim2.fromOffset(nl + ax * w, nt + ay * h)
+end
+
 function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
 	local container = screen:FindFirstChild("Container") :: GuiObject?
 	if not container then return end
@@ -90,6 +117,7 @@ function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
 	-- That is what cuts the corner off the close button (worse once it grows on
 	-- hover). Nothing useful is ever clipped at this level.
 	container.ClipsDescendants = false
+	UIKit.tuckCloseButton(container)
 
 	if fill then UIKit.pinEdges(container, design :: Vector2) end
 
@@ -198,6 +226,20 @@ end
 function UIKit.flash(target: GuiObject)
 	local face = target:FindFirstChild("Face") or target
 	if not face:IsA("GuiObject") then face = target end
+	-- The sheen is a rotated bar taller and wider than the button, swept across it.
+	-- Parented straight onto the face it spills out over everything around the
+	-- button, because panels deliberately do not clip (that is what stops the close
+	-- button being cut off). So it goes in a mask of exactly the button's size that
+	-- DOES clip, carrying the same rounded corner, and the sweep is trimmed to the
+	-- button's own shape.
+	local mask = Instance.new("Frame")
+	mask.Name = "__FlashMask"
+	mask.BackgroundTransparency = 1
+	mask.BorderSizePixel = 0
+	mask.Size = UDim2.fromScale(1, 1)
+	mask.ClipsDescendants = true
+	mask.ZIndex = 40
+
 	local shine = Instance.new("Frame")
 	shine.Name = "__Flash"
 	shine.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -213,11 +255,17 @@ function UIKit.flash(target: GuiObject)
 		c.CornerRadius = corner.CornerRadius
 		c.Parent = shine
 	end
-	shine.Parent = face
+	if corner then
+		local mc = Instance.new("UICorner")
+		mc.CornerRadius = corner.CornerRadius
+		mc.Parent = mask
+	end
+	mask.Parent = face
+	shine.Parent = mask
 	local t = TweenService:Create(shine, TweenInfo.new(0.35, Enum.EasingStyle.Quad),
 		{ Position = UDim2.new(1.1, 0, -0.3, 0), BackgroundTransparency = 1 })
 	t:Play()
-	t.Completed:Connect(function() shine:Destroy() end)
+	t.Completed:Connect(function() mask:Destroy() end)
 end
 
 -- panels bounce in from small, and pop out on close
