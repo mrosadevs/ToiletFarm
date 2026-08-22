@@ -282,6 +282,112 @@ function DataService.poopRateBase(player: Player): number
 	return rate
 end
 
+-- ── global leaderboards ─────────────────────────────────────────────────
+-- An OrderedDataStore is the only way to get a cross-server top N, and this module
+-- is the only one allowed near DataStoreService, so both halves live here and
+-- LeaderboardService merely renders what it is handed.
+local BOARD_STORES = {
+	Networth   = "TF_Board_Networth_v1",
+	Toilets    = "TF_Board_Toilets_v1",
+	Playtime   = "TF_Board_Playtime_v1",
+}
+
+-- An OrderedDataStore value must be a signed 64-bit integer, and late-game cash in
+-- this game runs past that without effort. Anything above the ceiling ranks at the
+-- ceiling, which costs nothing real: they are already top of the board.
+local ORDERED_MAX = 9e15
+
+local orderedStores: { [string]: OrderedDataStore } = {}
+local function orderedStore(board: string): OrderedDataStore?
+	if not BOARD_STORES[board] then return nil end
+	local existing = orderedStores[board]
+	if existing then return existing end
+	local ok, s = pcall(function()
+		return DataStoreService:GetOrderedDataStore(BOARD_STORES[board])
+	end)
+	if not ok then return nil end
+	orderedStores[board] = s
+	return s
+end
+
+local function boardValue(board: string, p): number
+	if board == "Networth" then
+		return p.cash or 0
+	elseif board == "Playtime" then
+		return (p.stats and p.stats.playtime) or 0
+	end
+	-- Toilets: merge-equivalents, the same figure the HUD calls "Total Toilets", so a
+	-- farm of three Tier 4s does not rank below a farm of ten Tier 1s
+	local n = 0
+	for _, t in ipairs(p.toilets or {}) do
+		n += Config.MERGE_COUNT ^ ((t.tier or 1) - 1)
+	end
+	return n
+end
+
+-- Called from the save path, so scores go out on the same cadence as the profile.
+function DataService.publishScores(player: Player, p)
+	if studioNoApi then return end
+	for board in pairs(BOARD_STORES) do
+		local s = orderedStore(board)
+		if s then
+			local value = math.floor(math.clamp(boardValue(board, p), 0, ORDERED_MAX))
+			-- one player's board write must never take down a save
+			local ok, err = pcall(function()
+				s:SetAsync(tostring(player.UserId), value)
+			end)
+			if not ok then
+				warn(("[DataService] leaderboard %s write failed: %s"):format(board, tostring(err)))
+			end
+		end
+	end
+end
+
+-- userId -> name, resolved once. GetNameFromUserIdAsync is a web call and the same
+-- handful of ids come back on every refresh.
+local nameCache: { [number]: string } = {}
+local function nameFor(userId: number): string
+	local cached = nameCache[userId]
+	if cached then return cached end
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		nameCache[userId] = player.Name
+		return player.Name
+	end
+	local ok, name = pcall(function()
+		return Players:GetNameFromUserIdAsync(userId)
+	end)
+	local resolved = (ok and type(name) == "string") and name or ("User " .. userId)
+	nameCache[userId] = resolved
+	return resolved
+end
+
+-- Top `count` for a board, best first. Returns an empty list rather than throwing if
+-- the store is unreachable, so a leaderboard is never worse than blank.
+function DataService.topScores(board: string, count: number): { { userId: number, name: string, value: number } }
+	local out = {}
+	local s = orderedStore(board)
+	if not s or studioNoApi then return out end
+
+	local ok, pages = pcall(function()
+		return s:GetSortedAsync(false, math.clamp(count, 1, 100))
+	end)
+	if not ok then
+		warn(("[DataService] leaderboard %s read failed: %s"):format(board, tostring(pages)))
+		return out
+	end
+
+	local okPage, page = pcall(function() return pages:GetCurrentPage() end)
+	if not okPage then return out end
+	for _, entry in ipairs(page) do
+		local userId = tonumber(entry.key)
+		if userId then
+			table.insert(out, { userId = userId, name = nameFor(userId), value = entry.value })
+		end
+	end
+	return out
+end
+
 -- ── load / save ───────────────────────────────────────────────────────────
 -- Every write goes through UpdateAsync so the read-modify-write is atomic against
 -- other servers, and so a save can refuse to clobber a profile this server no
@@ -384,6 +490,9 @@ function DataService.save(player: Player, isFinal: boolean?): boolean
 		p.rateAtLogout = DataService.poopRate(player)
 		p.itemRateAtLogout = DataService.poopItemRate(player)
 	end
+	-- same cadence as the profile itself; spawned so a slow ordered-store write
+	-- cannot hold up the save that actually matters
+	task.spawn(DataService.publishScores, player, p)
 	if studioNoApi then return true end
 
 	local snapshot = deepCopy(p)

@@ -26,6 +26,7 @@ local TutorialService   = require(Services.TutorialService)
 local CodesService      = require(Services.CodesService)
 local PadService        = require(Services.PadService)
 local VfxService        = require(Services.VfxService)
+local LeaderboardService = require(Services.LeaderboardService)
 
 PassService.bindData(DataService)
 PassService.init()
@@ -39,6 +40,7 @@ ToiletService.init()
 EconomyService.init()
 LuckyBlockService.init()
 PadService.init()
+LeaderboardService.init()
 
 -- Poops are free physics bodies now, so the character has to sit in its own
 -- collision group or running through a heap punts it across the plot.
