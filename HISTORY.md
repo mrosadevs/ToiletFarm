@@ -192,6 +192,44 @@ through and everything below was then playtested in Studio.
   the HUD move from earlier in the session; the trade is unchanged and real -- a
   billboard shrinks with distance, so it cannot also be read from a farm.
 
+### Economy pass
+
+The owner set the target: a ten minute first rebirth, each one after it
+increasingly longer and harder.
+
+- **Rebirth costs are solved against a simulation now** (`53dbcb8`), committed under
+  `tools/`. It models production, merging, the buy curve and the flush meter's
+  weighted average (1.1375) for a player who grows the farm then banks. The old table
+  had never been checked against what the loop earns: $300K for the first rebirth is
+  25 minutes by this model, and $1.35e18 for the last is unreachable inside a day.
+
+  New curve -- 1: $19K/10m, 2: $400K/15m, 3: $3.3M/23m, 4: $19M/34m, 5: $110M/52m,
+  6: $640M/77m, 7: $4.6B/1.9h, 8: $32B/2.8h. About eight hours to the last one, each
+  run longer than the one before. Verified by re-running the model against the values
+  as written in the file rather than from notes.
+- **`BUY_PRODUCTION_SECONDS` 300 -> 120.** At 300 every toilet cost three seconds of
+  the WHOLE farm's output, so buying could never outrun income: the model sat at nine
+  of twenty-four stalls for hours. A batch of 100 still costs a couple of minutes of
+  production.
+- **Walk speed 16 -> 20** (`6839ebb`), set on the server on every spawn so a respawn
+  cannot quietly undo it.
+
+Two things the modelling caught that are worth not re-learning:
+
+- A naive "always buy" player never banks anything. An early run of the model
+  reported 22 hours for the first rebirth purely because of that policy; sensible
+  play is grow-then-bank, and the same costs then came out at 25 minutes.
+- **Rebirth resets `buyTier` to 1.** The Buy Tier ceiling (2 x rebirths) only says how
+  far you MAY raise it during a run. The first version of the model assumed you buy
+  at the ceiling, which made every run past the first unreachable -- a fresh $10
+  cannot buy a Tier 2.
+
+The model does NOT cover the Buy Tier upgrade, the cash/value upgrades, lucky blocks,
+offline earnings, the group pad or the cash packs, all of which make a real player
+faster. It is a pacing ceiling, not a promise. It also assumes NO gamepasses: the
+owner's own account holds DoublePoop and x2 Cash, so it earns about 4x the modelled
+baseline and will always beat these times.
+
 ### UI polish round
 
 - **Index grid sliced its fourth column** (`8d66fe5`). Authored 1060 wide for four
