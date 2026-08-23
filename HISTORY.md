@@ -6,6 +6,121 @@ what was verified, what was **not** done, and what the next session should pick 
 `ARCHITECTURE.md` describes the current state of the game.
 `CLAUDE.md` holds the always-on rules. This file is the timeline.
 
+## Session 6 — 2026-08-23 · Event RSVP prompt, and the Mute Toilets bug
+
+Two requests: raise the Roblox event join dialog four minutes into a session and
+only ever once, and fix a reported bug where muting toilets muted every sound
+effect and never came back.
+
+### Done
+
+- **The event prompt** (`8c60494`), `server/Services/EventPromptService`. Roblox
+  hosts the dialog itself (`SocialService:PromptRsvpToEventAsync`), so there is no
+  UI and nothing to style. The event id is
+  [8920116003959079575](https://www.roblox.com/events/8920116003959079575), at the
+  top of the service — it is not balance, so it is not in `ToiletConfig`.
+  `profile.eventPrompt` records the id a player has already been shown, so "once"
+  survives a rejoin and a server hop. It holds the **id, not a boolean**, so
+  announcing a new event asks once more rather than one flag silencing every event
+  this game will ever run. Detail in `ARCHITECTURE.md`.
+- **The Mute Toilets fix** (`9535da6`), two parts.
+
+The reported bug is real and it is one line: `TOILET_SOUNDS` swallowed `PoopPlop`
+and `PoopDeposit` alongside `Flush`. Those two are the pickup and the deposit —
+the player's own actions, not a toilet — and between them and the flush that is
+**every sound the core loop makes**. Turning on one toilet setting left UI clicks
+and footsteps, and since the setting is saved it stayed that way across rejoins.
+Only the flush is toilet noise now, and it is the noise anyone would want gone: it
+fires on every drop, dozens a second on a full farm.
+
+The second part is why "forever" was in the report. The toggle sent its intent to
+the server and did nothing else, waiting for the echo to come back before the
+audio changed — unlike the slider directly above it, which applies as it drags. A
+dropped echo (profile not loaded yet, so `SetSetting` returns without pushing)
+left the switch showing one thing and the audio doing another, **with no way
+back**: the next click reads the switch, so it sends the state the audio is
+already stuck in and never the other one. The toggle now applies locally too. The
+server is still the authority and its push still overrides.
+
+### Verified
+
+Everything below is from a Studio playtest on the real profile, which loaded this
+time — the live-server lock that blocked all of session 5 was gone.
+
+- **The four-minute timer fired for real**, watched live: at the 240s mark the
+  `eventPrompt` state push and the `PromptEventRsvp` remote landed in that order —
+  the mark is written before the dialog goes up, as designed.
+- **The dialog really rendered.** It is CoreGui, so it cannot be screen-captured,
+  but it blocked the next synthetic mouse click with "position hits CoreGUI",
+  which is the same evidence the invite dialog has never managed to produce.
+- **"Once" holds across a rejoin.** `eventPrompt` was read back out of the
+  DataStore after the stop (`"8920116003959079575"`), and a second join watched for
+  **290 seconds past the 240s mark fired the prompt zero times**.
+- **The API shape was verified against the live engine, not from memory.**
+  `PromptRsvpToEventAsync(eventId)` takes the **id alone** — no player argument,
+  contrary to the sibling `PromptGameInvite`. Passing a player as argument 1 fails
+  with "Received invalid event id", which is what sent the first three attempts
+  down the wrong path. `GetEventRsvpStatusAsync(id)` returned `RsvpStatus.None` for
+  this account, confirming the id itself resolves.
+- **The mute fix, by real mouse clicks on the real toggle.** Muted: 11 drops → **0
+  flush sounds**, while `PoopPlop` kept playing at full volume. Unmuted with a
+  second click: 10 drops → 6 flush sounds. A longer 130s sample under mute counted
+  **264 drops with 0 flushes** and heard `PoopPlop` throughout plus `PoopDeposit`
+  and `Confetti` on a deposit — all three of which used to be silenced.
+- The slider beside it was checked at the same time and is fine: a click at 25% of
+  the track committed 0.248 and the volume of the next sound was 0.2484.
+- **Analytics ran against a real profile at last**, partially closing session 5's
+  largest open item: real joins, the 5s tick, and `Session` funnel milestones all
+  fired, plus the new `EventPromptShown` custom event, with **no `[Analytics]`
+  warnings** on any of the four playtests.
+- `rojo build` passes. Rojo synced cleanly with **no duplicate scripts** in any of
+  the three owned trees.
+
+### Not done / carried forward
+
+- **The event id has a shelf life.** When the event is over, `EVENT_ID` in
+  `EventPromptService` needs replacing or the whole service disabling, or players
+  will keep being offered a dead event. Nothing in the code notices this.
+- **Neither change has been seen in a published client**, only in Studio. The RSVP
+  dialog in particular is a CoreGui prompt whose Studio behaviour is not proof of
+  its live behaviour.
+- **The rebirth funnel still cannot be tested on this save.** The owner is at
+  Rebirth 8, which is max, so `Config.rebirthCost` returns nil and `updateRun`
+  bails by design — `RunStart`/`Quarter`/`Half`/`Affordable`/`Rebirthed` and the
+  progression Start/Complete have still never fired. That needs a lower-rebirth
+  account, not a code change.
+- **Pooled economy flushes were not isolated**, only very likely exercised by auto
+  collect during the playtests. Nothing was asserted about them.
+- **Testing was again done on the owner's real profile.** The `Sfx` setting was
+  moved to 0.248 by the slider test and put back to 1.0 through the normal remote
+  before the session ended; `MuteToilets` was toggled repeatedly and ended off, as
+  it started. `eventPrompt` is now legitimately spent on that account, so the
+  owner will not see the dialog again.
+- Carried forward from session 5, all still open:
+  - Analytics **only reach the dashboard after publishing** the place. Studio fires
+    the events and they go nowhere.
+  - The **invite dialog** has still never been seen.
+  - The **stranded-toilet buyback** has never fired on a live upgrade.
+  - **Freecam gamepad support and published-client behaviour** untested.
+  - The place **still needs saving by the owner** for the `Workspace.Vfx` deletion.
+  - The **group-join prompt** has never been watched firing.
+  - A **fresh, pass-free save** is still needed to confirm the ten-minute first
+    rebirth.
+  - **Part count** after the 108-stall change (~963/plot, ~5,800 across six farms)
+    is unprofiled.
+  - From session 3: the **map geometry deleted without asking**
+    (`SideReturnLeft/Right`, `BackFeederLeft/Right`, `MergeFeederLeft/Right`); the
+    **"2nd variant" pillar report**, which needs the partner to say what it means.
+  - **`selene`, `stylua` and `luau-lsp` are still not installed** — only `rojo`,
+    via `aftman`, not the pinned `rokit` toolchain. The 31-warning lint baseline
+    could not be checked and nothing typechecks: `rojo build` remains the only
+    static gate.
+  - A Studio side-effect worth remembering: `JOB_ID` is `"studio_" .. os.time()`,
+    a fresh id per play session, so hard-stopping a playtest leaves a lock that
+    blocks the next one for the full 240s.
+
+---
+
 **Rule for whoever writes here:** record what actually happened, including what was
 skipped and why. An entry that only lists wins is worse than no entry — the value of
 this file is that the unfinished work stays visible across sessions.
