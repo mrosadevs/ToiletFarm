@@ -9,6 +9,7 @@ local Net = require(Shared.Net)
 local Config = require(Shared.ToiletConfig)
 local DataService = require(script.Parent.DataService)
 local PlotService = require(script.Parent.PlotService)
+local Analytics = require(script.Parent.AnalyticsService)
 
 local StepEvent = Net.event(Net.NAMES.TutorialStep)
 
@@ -80,10 +81,14 @@ function TutorialService.notify(player: Player, id: string, amount: number?)
 	progress[player] = (progress[player] or 0) + (amount or 1)
 	if progress[player] >= step.goal then
 		progress[player] = 0
+		-- captured before the increment: this is the step that was just finished,
+		-- and it is what the onboarding funnel numbers itself from
+		local completed = p.tutorial
 		p.tutorial += 1
 		if p.tutorial > #TutorialService.STEPS then p.tutorial = 0 end
 		StepEvent:FireClient(player, { completed = step.id, index = p.tutorial })
 		DataService.push(player, { tutorial = p.tutorial })
+		Analytics.tutorialStep(player, completed, step.id)
 		task.wait(0.8)
 	end
 	TutorialService.push(player)

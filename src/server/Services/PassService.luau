@@ -14,6 +14,8 @@ local PassService = {}
 -- Injected by Main rather than required. DataService already reaches into
 -- PassService for pass ownership, so requiring it back here would make the two
 -- modules mutually dependent.
+local Analytics = require(script.Parent.AnalyticsService)
+
 local DataService: any = nil
 
 function PassService.bindData(service: any)
@@ -224,6 +226,10 @@ function PassService.init()
 		for name, id in pairs(PassService.PASSES) do
 			if id == passId then
 				print(("[PassService] %s bought %s"):format(player.Name, name))
+				-- Gamepasses never reach ProcessReceipt, so this signal is where their
+				-- sale gets reported. Roblox only raises it with purchased = true once
+				-- the sale has gone through, which is the same guarantee by another door.
+				Analytics.passBought(player, name, Prices.DASHBOARD["pass_" .. name] or 0)
 				-- Auto Collect is the whole product: switch it on rather than leaving the
 				-- buyer to find a toggle in Settings before their purchase does anything.
 				local profile = DataService and DataService.get(player)
@@ -294,6 +300,10 @@ function PassService.init()
 				end
 
 				print(("[PassService] %s purchased %s (receipt %s)"):format(player.Name, name, purchaseKey))
+				-- Reported only here: the ledger entry is durable and the next line
+				-- answers PurchaseGranted. Reporting at the prompt instead would count
+				-- purchases that were never actually charged for.
+				Analytics.robuxSpent(player, name, Prices.DASHBOARD["prod_" .. name] or 0)
 				return Enum.ProductPurchaseDecision.PurchaseGranted
 			end
 		end

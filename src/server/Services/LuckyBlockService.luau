@@ -16,6 +16,7 @@ local PlotService = require(script.Parent.PlotService)
 local ToiletService = require(script.Parent.ToiletService)
 local PoopService = require(script.Parent.PoopService)
 local IndexService = require(script.Parent.IndexService)
+local Analytics = require(script.Parent.AnalyticsService)
 
 local BlockModels = ServerStorage.Assets:WaitForChild("LuckyBlocks")
 local PromptEvent = Net.event(Net.NAMES.LuckyPrompt)
@@ -240,6 +241,7 @@ function LuckyBlockService.open(player: Player, blockUid: string, paidWithRobux:
 			return
 		end
 		p.cash -= cost
+		Analytics.cashSpent(player, cost, p.cash, Enum.AnalyticsEconomyTransactionType.Shop, "LuckyUnlock_" .. entry.id)
 	end
 
 	takeFromInventory(player, blockUid)
@@ -260,6 +262,9 @@ function LuckyBlockService.open(player: Player, blockUid: string, paidWithRobux:
 	end
 
 	DataService.push(player)
+	-- value is the tier rolled, detail the block opened, so the dashboard can show
+	-- what each block actually pays out rather than what the odds table claims
+	Analytics.custom(player, "LuckyBlockOpened", tier, entry.id)
 	ResultEvent:FireClient(player, {
 		blockId = entry.id,
 		tier = tier,

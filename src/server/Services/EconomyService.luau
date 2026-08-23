@@ -14,6 +14,7 @@ local PlotService = require(script.Parent.PlotService)
 local PassService = require(script.Parent.PassService)
 local FlushMeterService = require(script.Parent.FlushMeterService)
 local ToiletService = require(script.Parent.ToiletService)
+local Analytics = require(script.Parent.AnalyticsService)
 
 local DepositedEvent = Net.event(Net.NAMES.Deposited)
 local CashEvent      = Net.event(Net.NAMES.CashCollected)
@@ -163,6 +164,9 @@ function EconomyService.collectCash(player: Player, worldPos: Vector3?)
 	p.cash += amount
 	CashEvent:FireClient(player, { amount = amount, pos = worldPos })
 	DataService.push(player, { cash = p.cash })
+	-- Pooled, not reported outright: Auto Collect Cash lands here every two seconds
+	-- and would otherwise post an economy event on that same cadence all session.
+	Analytics.cashEarnedPooled(player, amount, "PoopSales")
 	-- only for a real walk-on collection; Auto Collect fires this every tick with no
 	-- position and would otherwise spray particles continuously
 	if worldPos then
@@ -219,6 +223,7 @@ function EconomyService.buyProcessing(player: Player)
 	p.cash -= cost
 	p.processing = level + 1
 	DataService.push(player, { cash = p.cash, processing = p.processing })
+	Analytics.cashSpent(player, cost, p.cash, Enum.AnalyticsEconomyTransactionType.Shop, "Processing")
 	toast(player, ("Processing → %s/sec"):format(Format.short(Config.processRate(p.processing))), "reward")
 	return true
 end
@@ -234,6 +239,8 @@ function EconomyService.buyUpgrade(player: Player, key: string)
 	p.upgrades[key] = level + 1
 	if key == "PlotSlots" then PlotService.refreshStalls(player) end
 	DataService.push(player)
+	-- one sku per upgrade, so the economy page shows which of them people buy
+	Analytics.cashSpent(player, cost, p.cash, Enum.AnalyticsEconomyTransactionType.Shop, "Upgrade_" .. key)
 	toast(player, ("%s → level %d"):format(Config.UPGRADES[key].label, level + 1), "reward")
 	return true
 end
@@ -251,6 +258,7 @@ function EconomyService.buyPerk(player: Player, id: string)
 			p.perks[id] = owned + 1
 			if id == "ExtraPlot" then PlotService.refreshStalls(player) end
 			DataService.push(player)
+			Analytics.tokensSpent(player, perk.cost, p.tokens, "Perk_" .. id)
 			toast(player, perk.label .. " unlocked!", "reward")
 			return true
 		end
@@ -314,6 +322,16 @@ function EconomyService.rebirth(player: Player)
 	toast(player, ("REBIRTH %d! Now x%s income"):format(p.rebirths, entry.mult), "reward")
 	-- the one genuinely big moment in the loop; make it visible across the server
 	require(script.Parent.VfxService).playAt(player, "confetti", Vector3.new(0, 0, 0), 40)
+
+	-- What the rebirth cost, what it paid, and the step that closes the RebirthRun
+	-- funnel and completes the progression level. Reported here rather than at the
+	-- pad, so a rebirth that failed a check above is never counted as one that
+	-- happened.
+	if cost then
+		Analytics.cashSpent(player, cost, p.cash, Enum.AnalyticsEconomyTransactionType.Gameplay, "Rebirth")
+	end
+	Analytics.tokensEarned(player, entry.tokens, p.tokens, "Rebirth")
+	Analytics.rebirthed(player, p.rebirths)
 	return true
 end
 
@@ -381,6 +399,12 @@ function EconomyService.upgradeBuyTier(player: Player)
 	end
 
 	DataService.push(player)
+	Analytics.cashSpent(player, cost, p.cash, Enum.AnalyticsEconomyTransactionType.Shop, "BuyTier")
+	if sold > 0 then
+		Analytics.cashEarned(player, refund, p.cash, Enum.AnalyticsEconomyTransactionType.Gameplay, "StrandedToiletRefund")
+	end
+	-- the tier is the value, so the dashboard shows how far up the ladder people get
+	Analytics.custom(player, "BuyTierUpgraded", p.buyTier)
 	return true
 end
 
@@ -464,6 +488,12 @@ function EconomyService.claimOffline(player: Player, doubled: boolean?)
 	p.poops += grant.value
 	p.poopItems += grant.items
 	DataService.push(player, { poops = p.poops, poopItems = p.poopItems })
+	-- Written out rather than `doubled and "x2" or "x1"`. That reads the same and
+	-- is the pattern this codebase keeps getting caught by, so it does not go in
+	-- even where it would happen to work.
+	local kind
+	if doubled then kind = "x2" else kind = "x1" end
+	Analytics.custom(player, "OfflineClaim", grant.items, kind)
 	return true
 end
 
@@ -496,6 +526,7 @@ function EconomyService.groupReward(player: Player, worldPos: Vector3?)
 	p.lastGroupRewardAt = os.time()
 	p.cash += amount
 	DataService.push(player, { cash = p.cash })
+	Analytics.cashEarned(player, amount, p.cash, Enum.AnalyticsEconomyTransactionType.TimedReward, "GroupReward")
 	CashEvent:FireClient(player, { amount = amount, pos = worldPos })
 	toast(player, ("Thanks for joining! +%s"):format(Format.cash(amount)), "reward")
 	if worldPos then
@@ -529,6 +560,7 @@ function EconomyService.freeMoney(player: Player)
 	p.cash += reward
 	CashEvent:FireClient(player, { amount = reward })
 	DataService.push(player, { cash = p.cash })
+	Analytics.cashEarned(player, reward, p.cash, Enum.AnalyticsEconomyTransactionType.TimedReward, "FreeMoneyChest")
 	toast(player, "Free money claimed!", "reward")
 	return reward
 end

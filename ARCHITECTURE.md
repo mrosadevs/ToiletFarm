@@ -52,6 +52,7 @@ mutation, lucky-block and prop prefabs) · Lighting · `MaterialService` variant
 | `Services/TutorialService` | Step tracking and prompts. |
 | `Services/PadService` | Walk-on pads: buy, upgrade, process, finish-now, pass prompts. |
 | `Services/CodesService` | Redeemable codes. |
+| `Services/AnalyticsService` | Every event the game reports to the Creator Dashboard: the tutorial as an onboarding funnel, session-playtime and rebirth-run funnels, the rebirth progression path, and the cash/token/Robux economy flows. |
 | `Security/RemoteGuard` | The single door for every client-to-server call: rate limit, argument validation, dispatch. |
 | `Security/RateLimiter` | Per-player, per-action token buckets. |
 
@@ -115,6 +116,51 @@ client trust is cosmetic: the client picks its own VFX and audio timing.
   is confirmed saved.
 - A failed *load* kicks the player rather than handing out a fresh profile,
   because a fresh profile would overwrite real progress on the next autosave.
+
+## Analytics
+
+`AnalyticsService` is the only module that calls Roblox's `AnalyticsService`, and
+everything it reports is raised from the server path that already decided the
+thing happened. There is no remote and no client entry point: a client that could
+post its own funnel steps could invent an audience.
+
+Nothing it does may affect gameplay. Every call is wrapped, and a failure warns
+once per event and is then swallowed for the life of the server — a reporting
+outage must not stop somebody buying a toilet, and a broken event must not write a
+log line on every fire.
+
+| What | How it is reported | Reads as |
+|---|---|---|
+| Tutorial | Onboarding funnel, step 1 `Joined` then one per `TutorialService.STEPS` entry | Which tutorial step first-time players quit on |
+| Playtime | `Session` funnel, steps at 1/5/10/20/30/60 minutes, plus a `SessionEnd` custom event carrying the exact minutes | Where inside a sitting people leave |
+| Rebirth grind | `RebirthRun` funnel: run start, 25%, 50%, 75%, affordable, rebirthed | How far up the cost of the next rebirth a sitting gets. **`Affordable` → `Rebirthed` is the row to watch**: a drop there is not pacing, it is somebody who had the cash and did not press the button |
+| Rebirth ladder | Progression path `Rebirth`, one level per rebirth, Start and Complete | Per-level completion rate over a player's lifetime |
+| Cash, tokens, Robux | Economy source/sink events, one `sku` per thing bought or reason paid | Where money comes from and goes |
+
+Three things about it are load-bearing:
+
+- **Scope is chosen per event, and the two scopes are different.** The onboarding
+  funnel and the progression Start are *lifetime* events, so their high-water marks
+  are persisted in `profile.analytics` — held in memory they would re-report on
+  every server the player touched. The `Session` and `RebirthRun` funnels are
+  per-sitting, and their session ids are regenerated on join, which is what makes
+  them answer the drop-off question at all.
+- **Custom fields are buckets, never raw values.** Roblox gives an event exactly
+  three, and each wants a small set of distinct values because they are dashboard
+  breakdowns. Fields 1 and 2 are the same on every event — rebirth bucket and total
+  playtime bucket — so any funnel can be read per progression stage and per cohort
+  age. Field 3 is the event's own detail and defaults to whether the player has
+  ever paid. A cash amount in a custom field would make the breakdown useless.
+- **The two high-frequency cash paths are pooled.** Auto Collect Cash lands in
+  `collectCash` every two seconds, and the bulk Buy pad calls `ToiletService.buy`
+  up to forty-one times for one press. Both accumulate per sku and flush once per
+  five-second tick, which reports identical totals against the same balance
+  without putting forty rows on the dashboard for one button press.
+
+Old profiles are seeded rather than left at zero: a save written before this
+existed carries `analytics.onboard = 0` even if the player finished the tutorial
+months ago, so the mark is back-filled from `profile.tutorial` on join and
+veterans never enter the top of a first-timers' funnel.
 
 ## Known debt
 

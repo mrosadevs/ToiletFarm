@@ -11,6 +11,7 @@ local Format = require(Shared.Format)
 local Net = require(Shared.Net)
 local DataService = require(script.Parent.DataService)
 local LuckyBlockService = require(script.Parent.LuckyBlockService)
+local Analytics = require(script.Parent.AnalyticsService)
 
 local ToastEvent = Net.event(Net.NAMES.Toast)
 
@@ -48,10 +49,14 @@ function CodesService.redeem(player: Player, raw: string)
 	if reward.cash then
 		local amount = reward.cash * Config.rebirthMultiplier(p.rebirths)
 		p.cash += amount
+		-- the code itself is the sku; CODES is a short fixed list, so this stays a
+		-- bounded set the dashboard can group by
+		Analytics.cashEarned(player, amount, p.cash, Enum.AnalyticsEconomyTransactionType.TimedReward, "Code_" .. code)
 		table.insert(parts, "$" .. Format.cash(amount))
 	end
 	if reward.tokens then
 		p.tokens += reward.tokens
+		Analytics.tokensEarned(player, reward.tokens, p.tokens, "Code_" .. code)
 		table.insert(parts, reward.tokens .. " Flush Token" .. (reward.tokens > 1 and "s" or ""))
 	end
 	if reward.lucky then
@@ -60,6 +65,7 @@ function CodesService.redeem(player: Player, raw: string)
 	end
 
 	DataService.push(player)
+	Analytics.custom(player, "CodeRedeemed", 1, code)
 	ToastEvent:FireClient(player, "Redeemed: " .. table.concat(parts, " + "), "reward")
 	return true
 end

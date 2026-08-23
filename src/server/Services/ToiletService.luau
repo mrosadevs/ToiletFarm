@@ -13,6 +13,7 @@ local PlotService = require(script.Parent.PlotService)
 local PoopService = require(script.Parent.PoopService)
 local PassService = require(script.Parent.PassService)
 local IndexService = require(script.Parent.IndexService)
+local Analytics = require(script.Parent.AnalyticsService)
 
 local ToastEvent = Net.event(Net.NAMES.Toast)
 local MergeResult = Net.event(Net.NAMES.MergeResult)
@@ -151,6 +152,10 @@ function ToiletService.buy(player: Player, amount: number)
 		if PlotService.freeSlot(player) then toast(player, "Not enough cash!", "error") end
 		return
 	end
+	-- Pooled, because the bulk Buy pad calls this up to forty-one times for a single
+	-- press, merging between each one. The batch tier is the quoted tier: every
+	-- toilet in this call was priced off it.
+	Analytics.cashSpentPooled(player, spent, ("Toilet_T%02d"):format(quotedTier))
 	compactSlots(player)
 	DataService.push(player)
 	return bought, lastTier, spent
