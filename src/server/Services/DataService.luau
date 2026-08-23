@@ -82,6 +82,10 @@ function DataService.default()
 		-- so the toggle is an opt-out for owners rather than a second thing to find
 		-- before a purchase starts working.
 		settings      = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = true, AutoCash = true },
+		-- The Roblox event this player has already been shown the RSVP dialog for.
+		-- The id rather than a boolean, so announcing a NEW event asks once more
+		-- instead of a single flag silencing every event this game ever runs.
+		eventPrompt   = "",
 		stats         = { playtime = 0, totalDeposited = 0, bestCash = 0 },
 		tutorial      = 1,      -- current step index; 0 once finished
 		-- What AnalyticsService has already reported for this player. Both of the

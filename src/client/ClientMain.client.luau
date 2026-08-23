@@ -102,6 +102,31 @@ Net.event(N.PromptGroupJoin).OnClientEvent:Connect(function(groupId)
 	end)
 end)
 
+-- The RSVP dialog is Roblox's own and client-only, so the server tells us when to
+-- raise it and we do nothing else with it. Like PromptJoinAsync it takes the id
+-- alone -- it is implicitly the local player -- and YIELDS for as long as the
+-- dialog is up, so it gets its own thread rather than stalling the remote handler.
+-- Whether the server should have asked at all is the server's decision and it has
+-- already been made and saved by the time this fires.
+Net.event(N.PromptEventRsvp).OnClientEvent:Connect(function(eventId)
+	if type(eventId) ~= "string" or eventId == "" then return end
+	task.spawn(function()
+		local SocialService = game:GetService("SocialService")
+		local ok, err = pcall(function()
+			-- Somebody who already said yes on the game page does not need asking.
+			-- The server has spent its one prompt either way, which is the right
+			-- answer: they are going, so there is nothing left to ask them.
+			if SocialService:GetEventRsvpStatusAsync(eventId) ~= Enum.RsvpStatus.None then
+				return
+			end
+			SocialService:PromptRsvpToEventAsync(eventId)
+		end)
+		if not ok then
+			warn("[ClientMain] event RSVP prompt failed: " .. tostring(err))
+		end
+	end)
+end)
+
 Net.event(N.Toast).OnClientEvent:Connect(function(text, kind)
 	-- the server uses this channel to ask the client to open a panel too
 	if text == "__OPEN_REBIRTH" then

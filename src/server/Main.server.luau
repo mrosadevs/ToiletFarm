@@ -28,6 +28,7 @@ local PadService        = require(Services.PadService)
 local VfxService        = require(Services.VfxService)
 local LeaderboardService = require(Services.LeaderboardService)
 local AnalyticsService  = require(Services.AnalyticsService)
+local EventPromptService = require(Services.EventPromptService)
 
 PassService.bindData(DataService)
 PassService.init()
@@ -48,6 +49,9 @@ EconomyService.init()
 LuckyBlockService.init()
 PadService.init()
 LeaderboardService.init()
+-- last of the services: it only starts a timer per player, and it needs both the
+-- profile and the analytics session to exist before that timer comes due
+EventPromptService.init()
 
 -- Poops are free physics bodies now, so the character has to sit in its own
 -- collision group or running through a heap punts it across the plot.

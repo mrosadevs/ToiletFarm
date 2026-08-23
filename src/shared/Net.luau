@@ -55,6 +55,7 @@ Net.NAMES = {
 	Toast          = "Toast",          -- {text, kind}
 	MergeResult    = "MergeResult",    -- {tier, count}
 	PromptGroupJoin = "PromptGroupJoin", -- {groupId} -- the join prompt is client-only
+	PromptEventRsvp = "PromptEventRsvp", -- {eventId} -- the RSVP dialog is client-only
 	PlayVfx        = "PlayVfx",        -- {key, position, burst} -- built and emitted client-side
 
 	-- client -> server

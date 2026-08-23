@@ -53,6 +53,7 @@ mutation, lucky-block and prop prefabs) · Lighting · `MaterialService` variant
 | `Services/PadService` | Walk-on pads: buy, upgrade, process, finish-now, pass prompts. |
 | `Services/CodesService` | Redeemable codes. |
 | `Services/AnalyticsService` | Every event the game reports to the Creator Dashboard: the tutorial as an onboarding funnel, session-playtime and rebirth-run funnels, the rebirth progression path, and the cash/token/Robux economy flows. |
+| `Services/EventPromptService` | The Roblox event RSVP dialog: who gets asked, when, and the once-per-event record that stops it coming back. |
 | `Security/RemoteGuard` | The single door for every client-to-server call: rate limit, argument validation, dispatch. |
 | `Security/RateLimiter` | Per-player, per-action token buckets. |
 
@@ -161,6 +162,30 @@ Old profiles are seeded rather than left at zero: a save written before this
 existed carries `analytics.onboard = 0` even if the player finished the tutorial
 months ago, so the mark is back-filled from `profile.tutorial` on join and
 veterans never enter the top of a first-timers' funnel.
+
+## The Roblox event prompt
+
+`EventPromptService` raises Roblox's own RSVP dialog four minutes into a session.
+Roblox hosts the dialog, so there is no UI here and nothing to style. The dialog is
+a **client-only** API, which is the only reason a remote is involved: the server
+decides who is asked and when, and `ClientMain` does nothing but raise it — the
+same shape the group-join pad already uses.
+
+- **Once means once, and it is persisted.** `profile.eventPrompt` records the event
+  id a player has already been shown, so the dialog cannot come back on a rejoin,
+  a server hop or the next session. It holds the *id* rather than a boolean so
+  announcing a new event asks once more, instead of one flag silencing every event
+  this game will ever run.
+- **The mark is written before the dialog is raised, and regardless of the answer.**
+  Showing it once is a promise about the dialog appearing, not about getting a yes;
+  a prompt that retried until somebody accepted would be the nagging this avoids.
+- The four minutes are measured from the join, not from when the profile finished
+  loading, so a slow load does not push the dialog later and later.
+- The client skips the prompt for anyone whose RSVP status is already not `None` —
+  they said yes on the game page, so there is nothing left to ask.
+
+The event id lives at the top of the service. It is not balance, so it is not in
+`ToiletConfig`.
 
 ## Known debt
 
