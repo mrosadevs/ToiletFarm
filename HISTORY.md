@@ -12,6 +12,115 @@ this file is that the unfinished work stays visible across sessions.
 
 ---
 
+## Session 5 — 2026-08-22 · Analytics funnels
+
+One request: funnels for the tutorial and the rest of the game, so users can be
+tracked properly and playtime drop-off — especially around rebirths — is visible.
+Built on Roblox's own `AnalyticsService`, so it lands on the Creator Dashboard with
+no third-party service and no HTTP.
+
+### Done
+
+- **The reporting layer** (`c7ada1b`), `server/Services/AnalyticsService`. One
+  module, every event, no remote and no client entry point — a client that can post
+  its own funnel steps is a client that can invent an audience. Every call is
+  wrapped and a failure warns **once per event** and is then swallowed for the life
+  of the server, so a reporting outage cannot stop somebody buying a toilet and a
+  broken event cannot write a log line on every fire. `profile.analytics`
+  (`{onboard, run}`) was added to the template for the two lifetime-scoped events.
+- **The call sites** (`c271009`): tutorial, playtime, rebirth grind, rebirth
+  ladder, and every cash/token/Robux flow. Detail in `ARCHITECTURE.md` under
+  Analytics.
+
+Three decisions that are load-bearing, all documented in the module:
+
+- **Scope is chosen per event, and the two scopes are opposites.** The tutorial is
+  Roblox's *onboarding* funnel, scoped to a player's lifetime — quitting on
+  "Deposit your Poops" and returning tomorrow is still one visit to that step — so
+  its high-water mark is persisted; in memory it would re-report every step on
+  every server the player touched. `Session` and `RebirthRun` regenerate their
+  session ids on join, and that per-sitting scope is the entire reason they can
+  answer the drop-off question.
+- **Custom fields are buckets, never raw values.** Roblox gives exactly three and
+  each wants a small distinct set, because they are breakdowns and not a payload.
+  Fields 1 and 2 are identical on every event — rebirth bucket, total playtime
+  bucket — so any funnel reads per progression stage and per cohort age.
+- **The two high-frequency cash paths are pooled.** Auto Collect Cash enters
+  `collectCash` every 2s, and the bulk Buy pad calls `ToiletService.buy` up to
+  **41 times for one press**. Both accumulate per sku and flush on the 5s tick:
+  same totals, same balance, without 40 dashboard rows per button press. The flush
+  takes the closing balance as an argument rather than reading the profile, because
+  the flush on the way out cannot count on there being one — DataService clears it
+  on its own `PlayerRemoving`, connected first and only yielding part way through.
+
+`Affordable → Rebirthed` is the row to watch on the rebirth funnel. A drop there is
+not pacing at all; it is a player who had the cash and did not press the button.
+
+Old saves are seeded from `profile.tutorial` on join, so veterans never enter the
+top of a first-timers' funnel.
+
+### Verified
+
+- **Every call shape, against the live API in a Studio playtest.** All eight event
+  types accepted — onboarding, funnel step, progression start/complete, economy
+  source/sink, the Robux IAP shape, custom — including a 10^15 economy amount.
+  Roblox logged "event fired" for all 18 calls with **no warnings raised**.
+- **The wrapper's own guards**, end to end through the module's exported functions:
+  `tutorialStep` and the rebirth funnel step correctly stayed silent with no
+  profile/session, the pooled calls only accumulated, and zero and negative amounts
+  were dropped.
+- **The server boots** with all the new requires in place — no cycle, no syntax
+  error, `AnalyticsService.init()` ran before "server ready".
+- `default().analytics` present; rebirth buckets bounded to 9 values (R0..R7, R8+);
+  `rebirthCost` returns nil at max, so `updateRun` bails for maxed players.
+- `rojo build` passes.
+
+### Not done / carried forward
+
+- **NOTHING was exercised against a real profile.** No join, no tutorial step, no
+  5-second tick, no session milestone, no rebirth gate, no pooled flush. The reason
+  is the item below, and it is the single most important thing for the next
+  session to close.
+- **The owner's profile is held by a live game server.** `violentlean` is in a
+  published server that refreshes its DataStore lock every 90 seconds, so Studio
+  can never take it — three playtests were kicked with "profile is still locked by
+  another server". Confirmed by reading the lock directly: a real GUID jobId, with
+  the heartbeat advancing by exactly 90s (the autosave interval) between polls.
+  **Leave the live game, or use a test account, and the whole integration can be
+  verified in one playtest.**
+- **A Studio side-effect worth knowing** (not a bug, not changed): `JOB_ID` is
+  `"studio_" .. os.time()`, a fresh id per play session, so hard-stopping a
+  playtest leaves a lock that blocks the next one for the full 240s.
+- **`AnalyticsService` synced into Studio as TWO identical ModuleScripts** after the
+  file was rewritten several times in quick succession. The duplicate was removed
+  and Rojo confirmed still driving the survivor via an appended-probe test. Worth
+  watching for after any burst of edits to one file.
+- Analytics **do not report in Studio** — events fire but go nowhere until the place
+  is published, so the dashboard will only start filling after a publish.
+- Carried forward from session 4, all still open:
+  - The **invite dialog** has never been seen; it is CoreGui and Studio's capture
+    does not render it. Needs one click in a live client.
+  - **Playtesting is still on the owner's real profile** — which is now actively
+    blocking work, not just risking data.
+  - The **stranded-toilet buyback** has never fired on a live upgrade (save is 5.09K
+    of the 15K toilets the next tier needs).
+  - **Freecam gamepad support and published-client behaviour** untested.
+  - The place **still needs saving by the owner** for the `Workspace.Vfx` deletion.
+  - The **group-join prompt** has never been watched firing.
+  - A **fresh, pass-free save** is still needed to confirm the ten-minute first
+    rebirth.
+  - **Part count** after the 108-stall change (~963/plot, ~5,800 across six farms)
+    is unprofiled.
+  - From session 3: the **map geometry deleted without asking**
+    (`SideReturnLeft/Right`, `BackFeederLeft/Right`, `MergeFeederLeft/Right`); the
+    **"2nd variant" pillar report**, which needs the partner to say what it means.
+  - **`selene` and `stylua` are still not installed** — only `rojo`, via `aftman`,
+    not the pinned `rokit` toolchain. The 31-warning lint baseline could not be
+    checked this session either, and nothing typechecks: `rojo build` is the only
+    static gate there is.
+
+---
+
 ## Session 4 — 2026-08-22 · Poop scale, lucky panel, freecam, and the top bar
 
 A long round of live feedback from the owner and the partner, then two tools: a
