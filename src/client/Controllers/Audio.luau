@@ -18,8 +18,15 @@ group.Parent = SoundService
 
 local music: Sound? = nil
 
--- sounds that count as "toilet noise" for the Mute Toilets setting
-local TOILET_SOUNDS = { Flush = true, PoopPlop = true, PoopDeposit = true }
+-- Sounds that count as "toilet noise" for the Mute Toilets setting, and it is only
+-- the flush. This used to take PoopPlop and PoopDeposit with it, which are the
+-- pickup and the deposit -- the player's own actions, not a toilet. Between them
+-- and the flush that is every sound the core loop makes, so switching one toilet
+-- setting on silenced the whole game and left only UI clicks and footsteps; and
+-- because the setting is saved, it stayed silent across rejoins. The flush is the
+-- noise somebody wants gone: it fires on every single drop, dozens a second on a
+-- full farm.
+local TOILET_SOUNDS = { Flush = true }
 
 function Audio.play(name: string, opts: any?)
 	local id = SoundIds[name]

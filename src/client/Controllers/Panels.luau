@@ -93,6 +93,14 @@ local function bindSettingRow(row: Frame, key: string)
 			State.data.settings[key] = not current
 			setSliderVisual(row, current and 0 or 1)
 			commit(not current)
+			-- Apply it here rather than waiting for the server to echo it back, the
+			-- way the slider below already does. The server stays the authority and
+			-- its push still overrides this. But a dropped echo -- the profile not
+			-- loaded yet, so SetSetting returns without pushing -- used to leave the
+			-- switch showing one thing and the audio doing another, with no way back:
+			-- the next click reads the switch, so it would send the state the audio
+			-- was already stuck in, never the other one.
+			Audio.applySettings(State.data.settings)
 		end, { hover = 1.02, press = 0.98 })
 	else
 		local track = row:FindFirstChild("SliderTrack") :: Frame?
