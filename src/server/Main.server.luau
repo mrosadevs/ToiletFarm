@@ -27,12 +27,19 @@ local CodesService      = require(Services.CodesService)
 local PadService        = require(Services.PadService)
 local VfxService        = require(Services.VfxService)
 local LeaderboardService = require(Services.LeaderboardService)
+local AnalyticsService  = require(Services.AnalyticsService)
 
 PassService.bindData(DataService)
 PassService.init()
 -- before anything can ask for an effect: it publishes the templates clients build from
 VfxService.init()
 DataService.init()
+-- After DataService, whose profile it waits on. The tutorial step list is handed
+-- over rather than required, so TutorialService -> AnalyticsService stays the only
+-- direction between those two and the funnel cannot go on describing an old step
+-- list after one is added.
+AnalyticsService.bindTutorial(TutorialService.STEPS)
+AnalyticsService.init()
 PlotService.init()
 PoopService.init()
 FlushMeterService.init()

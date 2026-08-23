@@ -84,6 +84,14 @@ function DataService.default()
 		settings      = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = true, AutoCash = true },
 		stats         = { playtime = 0, totalDeposited = 0, bestCash = 0 },
 		tutorial      = 1,      -- current step index; 0 once finished
+		-- What AnalyticsService has already reported for this player. Both of the
+		-- events these guard are scoped to a player's LIFETIME rather than to a
+		-- session, so the high-water marks have to survive a rejoin and a server hop
+		-- — held in memory they would re-report every step on every server the
+		-- player ever touched. `onboard` is the highest onboarding funnel step sent,
+		-- `run` the highest rebirth level a progression Start was sent for. Nothing
+		-- in the game reads either one.
+		analytics     = { onboard = 0, run = 0 },
 		-- os.time() of the last free-money chest claim. Persisted because an
 		-- uptime-based cooldown resets every time the player changes server.
 		lastChestAt   = 0,
