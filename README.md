@@ -116,14 +116,12 @@ ToiletFarm/
 │   └── 📁 shared/              # → ReplicatedStorage.Shared
 │       └── 📄 ToiletConfig.luau # 497 lines — the single source of balance
 ├── 📄 default.project.json     # Rojo mapping
-├── 📄 ARCHITECTURE.md          # what exists, and what is known-broken
-├── 📄 HISTORY.md               # session-by-session timeline
 └── 📄 CLAUDE.md                # always-on rules for AI-assisted work
 ```
 
 ## ⚠️ Before You Edit
 
-Read **`CLAUDE.md`** (always-on rules), **`ARCHITECTURE.md`** (what's real, including known debt), and the newest entry in **`HISTORY.md`** to pick up unfinished work.
+Read **`CLAUDE.md`** (always-on rules) before picking up unfinished work.
 
 Migrated from Studio on **2026-08-20**. The migration commit is pure movement — all 31 scripts byte-identical, verified by rebuilding the tree and diffing every source against the original place.
 
