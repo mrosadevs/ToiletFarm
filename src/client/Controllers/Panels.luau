@@ -181,16 +181,66 @@ local function initSettings()
 end
 
 -- ── Profile ────────────────────────────────────────────────────────────
+-- The Figma panel ships three stat rows -- Networth, Toilets, Time Played -- and
+-- rebirths was not one of them, so the number the whole progression is built
+-- around had nowhere to show.
+--
+-- Cloned off an authored row rather than built from scratch, so it matches the
+-- others exactly: same height, corner, border overlay and label geometry, whatever
+-- those are changed to in Studio. Same approach PadService takes for the pads that
+-- shipped without a billboard.
+local function ensureRebirthRow(panel: Instance): Frame?
+	local existing = panel:FindFirstChild("StatRow_Rebirths")
+	if existing then return existing :: Frame end
+
+	local rows: { Frame } = {}
+	for _, r in ipairs(panel:GetChildren()) do
+		if r:IsA("Frame") and r.Name:sub(1, 8) == "StatRow_" then table.insert(rows, r) end
+	end
+	if #rows == 0 then return nil end
+	table.sort(rows, function(a, b)
+		return a.Position.Y.Offset < b.Position.Y.Offset
+	end)
+
+	local last = rows[#rows]
+	-- Take the pitch from the rows themselves rather than pasting 88, so re-spacing
+	-- the panel in Studio moves this row with them instead of leaving it overlapping.
+	local gap = (#rows >= 2) and (last.Position.Y.Offset - rows[#rows - 1].Position.Y.Offset)
+		or (last.Size.Y.Offset + 16)
+
+	local copy = last:Clone()
+	copy.Name = "StatRow_Rebirths"
+	copy.LayoutOrder = last.LayoutOrder + 1
+	copy.Position = UDim2.new(
+		last.Position.X.Scale,
+		last.Position.X.Offset,
+		last.Position.Y.Scale,
+		last.Position.Y.Offset + gap
+	)
+	local key = copy:FindFirstChild("StatKey")
+	if key and key:IsA("TextLabel") then key.Text = "Rebirths" end
+	-- the mockup value is whatever the donor row was showing; refreshProfile
+	-- overwrites it immediately, but never leave a stale figure on screen
+	local value = copy:FindFirstChild("StatValue")
+	if value and value:IsA("TextLabel") then value.Text = "0" end
+	copy.Parent = panel
+	return copy
+end
+
 local function refreshProfile()
 	local screen = gui:FindFirstChild("ProfileScreen")
 	if not screen then return end
 	local panel = screen:FindFirstChild("ProfilePanel", true)
 	if not panel then return end
+	ensureRebirthRow(panel)
 	local d = State.data
+	local rebirths = d.rebirths or 0
 	local rows = {
 		Networth = "$" .. Format.cash(d.cash),
 		Toilets = ("%d / %d slots"):format(#(d.toilets or {}), d.slots or 8),
 		Time = Format.duration((d.stats and d.stats.playtime) or 0),
+		-- the multiplier is the reason anyone rebirths, so it reads alongside the count
+		Rebirths = ("%d  (x%s income)"):format(rebirths, Format.short(Config.rebirthMultiplier(rebirths))),
 	}
 	for _, row in ipairs(panel:GetChildren()) do
 		local key = row.Name:match("^StatRow_(.+)$")
