@@ -85,7 +85,9 @@ local function compactSlots(player: Player): boolean
 	local plot = PlotService.plotFor(player)
 	if not p or not plot then return false end
 
-	table.sort(p.toilets, function(a, b) return a.slot < b.slot end)
+	table.sort(p.toilets, function(a, b)
+		return a.slot < b.slot
+	end)
 
 	local t = timers[player] or {}
 	local newTimers: { [number]: number } = {}
@@ -135,8 +137,7 @@ function ToiletService.buy(player: Player, amount: number)
 		table.insert(p.toilets, entry)
 		if not PlotService.buildToilet(plot, slot, tier, "None") then
 			table.remove(p.toilets, #p.toilets)
-			warn(("[ToiletService] could not build tier %d in slot %d, purchase refunded")
-				:format(tier, slot))
+			warn(("[ToiletService] could not build tier %d in slot %d, purchase refunded"):format(tier, slot))
 			break
 		end
 		p.cash -= cost
@@ -192,7 +193,9 @@ function ToiletService.grant(player: Player, tier: number): (number?, string?)
 end
 
 local MUT_RANK = { None = 0 }
-for i, name in ipairs(Config.MUTATION_ORDER) do MUT_RANK[name] = i end
+for i, name in ipairs(Config.MUTATION_ORDER) do
+	MUT_RANK[name] = i
+end
 
 -- one pass: merge every eligible triple, lowest tier first so cascades resolve upward
 local function mergeOnce(player: Player): (number, number?)
@@ -209,7 +212,9 @@ local function mergeOnce(player: Player): (number, number?)
 	end
 
 	local tiers = {}
-	for tier in pairs(byTier) do table.insert(tiers, tier) end
+	for tier in pairs(byTier) do
+		table.insert(tiers, tier)
+	end
 	table.sort(tiers)
 
 	local merges, highest = 0, nil
@@ -217,7 +222,9 @@ local function mergeOnce(player: Player): (number, number?)
 		local group = byTier[tier]
 		while #group >= Config.MERGE_COUNT do
 			local inputs = {}
-			for _ = 1, Config.MERGE_COUNT do table.insert(inputs, table.remove(group)) end
+			for _ = 1, Config.MERGE_COUNT do
+				table.insert(inputs, table.remove(group))
+			end
 
 			-- the result inherits the BEST mutation of the three inputs.
 			-- Losing a Rainbow to a merge feels awful and makes players stop merging,
@@ -228,13 +235,18 @@ local function mergeOnce(player: Player): (number, number?)
 			end
 
 			-- keep the lowest slot for the result, free the other two
-			table.sort(inputs, function(a, b) return a.slot < b.slot end)
+			table.sort(inputs, function(a, b)
+				return a.slot < b.slot
+			end)
 			local keep = inputs[1]
 			for i = 2, #inputs do
 				local doomed = inputs[i]
 				PlotService.clearToilet(plot, doomed.slot)
 				for idx, t in ipairs(p.toilets) do
-					if t == doomed then table.remove(p.toilets, idx) break end
+					if t == doomed then
+						table.remove(p.toilets, idx)
+						break
+					end
 				end
 				if timers[player] then timers[player][doomed.slot] = nil end
 			end
@@ -280,9 +292,7 @@ function ToiletService.pendingMerges(player: Player): number
 			total += made
 			-- the results are themselves mergeable, which is why one step on the pad
 			-- can cascade several tiers up
-			if tier + 1 < Config.MAX_TIER then
-				count[tier + 1] = (count[tier + 1] or 0) + made
-			end
+			if tier + 1 < Config.MAX_TIER then count[tier + 1] = (count[tier + 1] or 0) + made end
 		end
 	end
 	return total
@@ -356,9 +366,20 @@ function ToiletService.resetTimers(player: Player)
 end
 
 function ToiletService.init()
-	Players.PlayerRemoving:Connect(function(player) timers[player] = nil end)
+	Players.PlayerRemoving:Connect(function(player)
+		timers[player] = nil
+	end)
+
+	-- The Auto Merge check does not need frame rate. It walks the whole farm and
+	-- asks PassService for pass ownership, and a merge is not a per-frame event.
+	local AUTO_MERGE_TICK = 0.25
+	local autoMergeAcc = 0
 
 	RunService.Heartbeat:Connect(function(dt)
+		autoMergeAcc += dt
+		local checkAutoMerge = autoMergeAcc >= AUTO_MERGE_TICK
+		if checkAutoMerge then autoMergeAcc = 0 end
+
 		for _, player in ipairs(Players:GetPlayers()) do
 			local p = DataService.get(player)
 			local plot = PlotService.plotFor(player)
@@ -366,9 +387,11 @@ function ToiletService.init()
 			local t = timers[player]
 			if not t then continue end
 
-			local speed = 1 - 0.03 * (p.upgrades.FlushSpeed or 0)
-			local valueUp = 1 + 0.10 * (p.upgrades.PoopValue or 0)
-			local mult = DataService.incomeMultiplier(player)
+			-- Resolved on the first drop of the frame, not every frame. These are only
+			-- read when a toilet actually fires, which is once every few seconds per
+			-- toilet -- and incomeMultiplier walks all 30 Index entries to do its job,
+			-- so computing it unconditionally cost that walk per player per frame.
+			local speed, valueUp, mult
 
 			for _, entry in ipairs(p.toilets) do
 				local left = t[entry.slot]
@@ -378,13 +401,20 @@ function ToiletService.init()
 				end
 				left -= dt
 				if left <= 0 then
+					if not mult then
+						speed = 1 - 0.03 * (p.upgrades.FlushSpeed or 0)
+						valueUp = 1 + 0.10 * (p.upgrades.PoopValue or 0)
+						mult = DataService.incomeMultiplier(player)
+					end
 					t[entry.slot] = Config.dropInterval(entry.tier) * speed
 					-- There is no carry cap any more, so toilets always litter. The
 					-- world-poop population is still bounded per plot in PoopService.drop.
 					local model = PlotService.toiletModel(plot, entry.slot)
 					if model then
-						local value = Config.poopValue(entry.tier) * valueUp
-							* (Config.MUTATIONS[entry.mut] or 1) * mult
+						local value = Config.poopValue(entry.tier)
+							* valueUp
+							* (Config.MUTATIONS[entry.mut] or 1)
+							* mult
 						local cf = model:GetPivot()
 						PoopService.drop(plot, cf.Position, entry.tier, entry.mut, value)
 					end
@@ -393,18 +423,24 @@ function ToiletService.init()
 				end
 			end
 
-			-- Auto Merge gamepass
-			if PassService.has(player, "AutoMerge") then
+			-- Auto Merge gamepass. The farm walk comes FIRST: PassService.has is only
+			-- cached once a lookup has succeeded, and a lookup that throws is retried,
+			-- so asking it every frame could put a web call on the Heartbeat for a
+			-- player whose check failed at join.
+			if checkAutoMerge then
 				local hasTriple = false
 				local count: { [number]: number } = {}
 				for _, e in ipairs(p.toilets) do
 					if e.mut == "None" and e.tier < Config.MAX_TIER then
 						count[e.tier] = (count[e.tier] or 0) + 1
-						if count[e.tier] >= Config.MERGE_COUNT then hasTriple = true break end
+						if count[e.tier] >= Config.MERGE_COUNT then
+							hasTriple = true
+							break
+						end
 					end
 				end
 				-- never auto-merge a mutated toilet without asking
-				if hasTriple then ToiletService.mergeAll(player) end
+				if hasTriple and PassService.has(player, "AutoMerge") then ToiletService.mergeAll(player) end
 			end
 		end
 	end)
