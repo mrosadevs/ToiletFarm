@@ -52,8 +52,14 @@ local function buildTemplate(tier: number): BasePart
 	-- Highlights and GUIs ride along on a clone and paint over the mutation FX we
 	-- add afterwards, so strip them here rather than per-drop.
 	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("Highlight") or d:IsA("BillboardGui") or d:IsA("SurfaceGui")
-			or d:IsA("Script") or d:IsA("LocalScript") or d:IsA("ProximityPrompt") then
+		if
+			d:IsA("Highlight")
+			or d:IsA("BillboardGui")
+			or d:IsA("SurfaceGui")
+			or d:IsA("Script")
+			or d:IsA("LocalScript")
+			or d:IsA("ProximityPrompt")
+		then
 			d:Destroy()
 		end
 	end
@@ -64,7 +70,9 @@ local function buildTemplate(tier: number): BasePart
 		for _, d in ipairs(model:GetDescendants()) do
 			if d:IsA("BasePart") then
 				local v = d.Size.X * d.Size.Y * d.Size.Z
-				if v > bestVol then bestVol, root = v, d end
+				if v > bestVol then
+					bestVol, root = v, d
+				end
 			end
 		end
 	end
@@ -113,7 +121,9 @@ local function buildTemplate(tier: number): BasePart
 		-- Collide as a BOX, never as the mesh. Irregular mesh collision is what
 		-- leaves visible gaps between poops in a heap.
 		if part:IsA("MeshPart") then
-			pcall(function() part.CollisionFidelity = Enum.CollisionFidelity.Box end)
+			pcall(function()
+				part.CollisionFidelity = Enum.CollisionFidelity.Box
+			end)
 		end
 		-- density 1, LOW friction so they flow into a pile instead of sticking where
 		-- they land, zero elasticity so they do not bounce around
@@ -153,10 +163,13 @@ local function templateFor(tier: number, mut: string): BasePart
 		if mutSource then
 			for _, d in ipairs(mutSource:GetDescendants()) do
 				if d:IsA("Highlight") then
-					local h = d:Clone(); h.Adornee = nil; h.Parent = final
+					local h = d:Clone()
+					h.Adornee = nil
+					h.Parent = final
 				elseif d:IsA("ParticleEmitter") then
 					local a = final:FindFirstChild("Fx") or Instance.new("Attachment")
-					a.Name = "Fx"; a.Parent = final
+					a.Name = "Fx"
+					a.Parent = final
 					d:Clone().Parent = a
 				end
 			end
@@ -172,7 +185,7 @@ end
 -- rides it inward to the centre channel, then travels down the funnel and comes to
 -- rest in front of the Merge pad, where the player walks over it to collect.
 -- All coordinates are in the plot's own space, so this works on every island.
-local BELT_SPEED = 14      -- studs/sec along the side belts
+local BELT_SPEED = 14 -- studs/sec along the side belts
 local MIDDLE_SPEED = 12
 local FALL_TIME = 0.32
 
@@ -207,8 +220,8 @@ local function routeOf(plot: Model)
 	if cached then return cached end
 	local base = plot:FindFirstChild("Base")
 	if not base then return nil end
-	local left   = base:FindFirstChild("LeftSideConveyor")
-	local right  = base:FindFirstChild("RightSideConveyor")
+	local left = base:FindFirstChild("LeftSideConveyor")
+	local right = base:FindFirstChild("RightSideConveyor")
 	local middle = base:FindFirstChild("MiddleConveyor")
 	local collect = base:FindFirstChild("CollectionArea")
 	if not (left and right and middle and collect) then return nil end
@@ -219,16 +232,25 @@ local function routeOf(plot: Model)
 		local c = cf:PointToObjectSpace(part.Position)
 		local rel = cf:Inverse() * part.CFrame
 		local ext = Vector3.new(
-			math.abs(rel.XVector.X) * part.Size.X + math.abs(rel.YVector.X) * part.Size.Y + math.abs(rel.ZVector.X) * part.Size.Z,
-			math.abs(rel.XVector.Y) * part.Size.X + math.abs(rel.YVector.Y) * part.Size.Y + math.abs(rel.ZVector.Y) * part.Size.Z,
-			math.abs(rel.XVector.Z) * part.Size.X + math.abs(rel.YVector.Z) * part.Size.Y + math.abs(rel.ZVector.Z) * part.Size.Z
+			math.abs(rel.XVector.X) * part.Size.X
+				+ math.abs(rel.YVector.X) * part.Size.Y
+				+ math.abs(rel.ZVector.X) * part.Size.Z,
+			math.abs(rel.XVector.Y) * part.Size.X
+				+ math.abs(rel.YVector.Y) * part.Size.Y
+				+ math.abs(rel.ZVector.Y) * part.Size.Z,
+			math.abs(rel.XVector.Z) * part.Size.X
+				+ math.abs(rel.YVector.Z) * part.Size.Y
+				+ math.abs(rel.ZVector.Z) * part.Size.Z
 		) * 0.5
 		return { c = c, e = ext, top = c.Y + ext.Y }
 	end
 
 	local L, R, M, C = box(left), box(right), box(middle), box(collect)
 	local route = {
-		left = L, right = R, middle = M, collect = C,
+		left = L,
+		right = R,
+		middle = M,
+		collect = C,
 		-- the belts meet the middle conveyor at its centre X
 		centreX = M.c.X,
 		-- where a poop lands after falling off the stall platform
@@ -260,8 +282,8 @@ local function runRoute(plot: Model, part: BasePart, startLocal: Vector3, spin: 
 
 	-- Per-poop variation. Without this every poop travelled the exact centre line at
 	-- the exact same speed, which is what made the belt look mechanical.
-	local lane = (math.random() - 0.5) * 2.4        -- offset across the belt
-	local speedMul = 0.82 + math.random() * 0.36    -- so they bunch and spread out
+	local lane = (math.random() - 0.5) * 2.4 -- offset across the belt
+	local speedMul = 0.82 + math.random() * 0.36 -- so they bunch and spread out
 	local swayPhase = math.random() * 6.28
 	local rollRate = (0.6 + math.random() * 0.7) * (math.random() < 0.5 and -1 or 1)
 
@@ -271,9 +293,7 @@ local function runRoute(plot: Model, part: BasePart, startLocal: Vector3, spin: 
 	-- the rotation actually being applied.
 	local function halfFor(rot)
 		local s = part.Size * 0.5
-		return math.abs(rot.XVector.Y) * s.X
-		     + math.abs(rot.YVector.Y) * s.Y
-		     + math.abs(rot.ZVector.Y) * s.Z
+		return math.abs(rot.XVector.Y) * s.X + math.abs(rot.YVector.Y) * s.Y + math.abs(rot.ZVector.Y) * s.Z
 	end
 
 	local function place(x, ySurface, z, extraSpin)
@@ -309,7 +329,8 @@ local function runRoute(plot: Model, part: BasePart, startLocal: Vector3, spin: 
 	--     floor that is really under the toilet rather than a fixed 0.5 stud drop
 	local lipZ = route.sideZ + route.left.e.Z + 1.5
 	local bin = part.Parent
-	local floorY = surfaceLocalY(plot, bin, startLocal.X, startLocal.Z, startLocal.Y + 3) or (startSurface - 0.5)
+	local floorY = surfaceLocalY(plot, bin, startLocal.X, startLocal.Z, startLocal.Y + 3)
+		or (startSurface - 0.5)
 	local t0 = os.clock()
 	while true do
 		local a = (os.clock() - t0) / 0.28
@@ -323,8 +344,9 @@ local function runRoute(plot: Model, part: BasePart, startLocal: Vector3, spin: 
 
 	-- 1b. drop off the lip onto the side belt below
 	local sideY = surfaceLocalY(plot, bin, startLocal.X, route.sideZ, startLocal.Y + 3) or route.sideTop
-	if not fall(startLocal.X, lipSurface, lipZ,
-	            startLocal.X, sideY, route.sideZ, FALL_TIME, 0.25) then return end
+	if not fall(startLocal.X, lipSurface, lipZ, startLocal.X, sideY, route.sideZ, FALL_TIME, 0.25) then
+		return
+	end
 
 	-- 2. ride the side belt inward. Left belt (+X side) runs toward -X, right belt
 	--    (-X side) runs toward +X; both feed the middle belt.
@@ -356,8 +378,7 @@ local function runRoute(plot: Model, part: BasePart, startLocal: Vector3, spin: 
 	local midX = route.centreX + lane * 0.5
 	local midY = surfaceLocalY(plot, bin, midX, joinZ, sideY + 5) or route.middleTop
 	-- a short, almost flat step down: it is a junction, not a launch
-	if not fall(route.centreX, sideY, route.sideZ,
-	            midX, midY, joinZ, 0.20, 0.06) then return end
+	if not fall(route.centreX, sideY, route.sideZ, midX, midY, joinZ, 0.20, 0.06) then return end
 
 	-- 4. the middle belt carries it forward, toward the player, into the collection area
 	local z = joinZ
@@ -394,8 +415,8 @@ local function runRoute(plot: Model, part: BasePart, startLocal: Vector3, spin: 
 	part.AssemblyLinearVelocity = travel * MIDDLE_SPEED
 		+ across * ((math.random() - 0.5) * 5)
 		+ Vector3.new(0, -1, 0)
-	part.AssemblyAngularVelocity = Vector3.new(
-		(math.random() - 0.5) * 6, (math.random() - 0.5) * 6, (math.random() - 0.5) * 6)
+	part.AssemblyAngularVelocity =
+		Vector3.new((math.random() - 0.5) * 6, (math.random() - 0.5) * 6, (math.random() - 0.5) * 6)
 end
 
 -- ── spawning ────────────────────────────────────────────────────────────
@@ -419,7 +440,9 @@ function PoopService.rideConveyor(plot: Model, model: Model, origin: Vector3, on
 	local function place(x: number, ySurface: number, z: number, dt: number?): boolean
 		if not model.Parent then return false end
 		spinT += (dt or 0)
-		model:PivotTo(CFrame.new(localToWorld(plot, x, ySurface + half, z)) * CFrame.Angles(0, spinT * 1.6, 0))
+		model:PivotTo(
+			CFrame.new(localToWorld(plot, x, ySurface + half, z)) * CFrame.Angles(0, spinT * 1.6, 0)
+		)
 		return true
 	end
 
@@ -441,8 +464,16 @@ function PoopService.rideConveyor(plot: Model, model: Model, origin: Vector3, on
 	local lipZ = route.sideZ + route.left.e.Z + 1.5
 	local startSurface = startLocal.Y - half
 	local sideY = surfaceLocalY(plot, model, startLocal.X, route.sideZ, startLocal.Y + 4) or route.sideTop
-	if not glide(startLocal.X, startSurface, startLocal.Z, startLocal.X, startSurface - 0.4, lipZ, 0.28, 0) then return end
-	if not glide(startLocal.X, startSurface - 0.4, lipZ, startLocal.X, sideY, route.sideZ, FALL_TIME, 0.3) then return end
+	if
+		not glide(startLocal.X, startSurface, startLocal.Z, startLocal.X, startSurface - 0.4, lipZ, 0.28, 0)
+	then
+		return
+	end
+	if
+		not glide(startLocal.X, startSurface - 0.4, lipZ, startLocal.X, sideY, route.sideZ, FALL_TIME, 0.3)
+	then
+		return
+	end
 
 	-- 2. inward along the side belt
 	local x = startLocal.X
@@ -504,8 +535,8 @@ local function dropPointFor(plot: Model, origin: Vector3): Vector3
 		local c = pcf:PointToObjectSpace(belt.Position)
 		-- the belt is yawed 90 degrees, so its depth along the plot's Z is Size.X
 		cached = {
-			z = c.Z + belt.Size.X * 0.5 - 0.8,   -- just inside the belt's far edge
-			y = c.Y + belt.Size.Y * 0.5 + 2.5,   -- a short visible drop onto the belt
+			z = c.Z + belt.Size.X * 0.5 - 0.8, -- just inside the belt's far edge
+			y = c.Y + belt.Size.Y * 0.5 + 2.5, -- a short visible drop onto the belt
 		}
 		dropCache[plot] = cached
 	end
@@ -549,12 +580,12 @@ function PoopService.drop(plot: Model, origin: Vector3, tier: number, mut: strin
 	local drop = dropPointFor(plot, origin)
 
 	p:SetAttribute("Arrived", false)
-	p.CFrame = CFrame.new(drop) * CFrame.Angles(
-		math.random() * 6.28, math.random() * 6.28, math.random() * 6.28)
+	p.CFrame = CFrame.new(drop)
+		* CFrame.Angles(math.random() * 6.28, math.random() * 6.28, math.random() * 6.28)
 	p.Parent = bin
 	p.AssemblyLinearVelocity = plot:GetPivot().LookVector * 2
-	p.AssemblyAngularVelocity = Vector3.new(
-		(math.random() - 0.5) * 6, (math.random() - 0.5) * 6, (math.random() - 0.5) * 6)
+	p.AssemblyAngularVelocity =
+		Vector3.new((math.random() - 0.5) * 6, (math.random() - 0.5) * 6, (math.random() - 0.5) * 6)
 	return p
 end
 
@@ -582,26 +613,31 @@ local function flyIntoPlayer(part: BasePart, hrp: BasePart)
 
 	-- a small kick upward so it lifts off the floor before it snaps in
 	part.AssemblyLinearVelocity = Vector3.new(0, 9, 0)
-	part.AssemblyAngularVelocity = Vector3.new(
-		(math.random() - 0.5) * 14, (math.random() - 0.5) * 14, (math.random() - 0.5) * 14)
+	part.AssemblyAngularVelocity =
+		Vector3.new((math.random() - 0.5) * 14, (math.random() - 0.5) * 14, (math.random() - 0.5) * 14)
 
 	local align = Instance.new("AlignPosition")
 	align.Attachment0 = from
 	align.Attachment1 = to
 	align.ApplyAtCenterOfMass = true
-	align.MaxForce = 400000     -- a poop weighs well under a stud-cube; this is ample
+	align.MaxForce = 400000 -- a poop weighs well under a stud-cube; this is ample
 	align.MaxVelocity = 600
-	align.Responsiveness = 85   -- snap, not a swoop: it should be gone in a blink
+	align.Responsiveness = 85 -- snap, not a swoop: it should be gone in a blink
 	align.Parent = part
 
 	local owner = Players:GetPlayerFromCharacter(hrp.Parent)
-	if owner then pcall(function() part:SetNetworkOwner(owner) end) end
+	if owner then pcall(function()
+		part:SetNetworkOwner(owner)
+	end) end
 
 	-- short: the flight is over in a fraction of this, and a poop that somehow never
 	-- reaches the player must not linger as a ghost
 	Debris:AddItem(to, 0.35)
 	Debris:AddItem(part, 0.35)
 end
+
+-- how far past the collect radius to wake the heap after a pickup; see collect()
+local WAKE_MARGIN = 8
 
 -- ── pickup ────────────────────────────────────────────────────────────────
 -- `animate` flies each poop into the player. Auto Collect passes false: it should
@@ -632,7 +668,9 @@ function PoopService.collect(player: Player, poops: { BasePart }, animate: boole
 	local payload = table.create(#taken)
 	for _, e in ipairs(taken) do
 		table.insert(payload, {
-			pos = e.part.Position, value = e.value, count = e.count,
+			pos = e.part.Position,
+			value = e.value,
+			count = e.count,
 			-- drives which gradient the floating number comes up in
 			tier = e.part:GetAttribute("Tier"),
 		})
@@ -642,6 +680,26 @@ function PoopService.collect(player: Player, poops: { BasePart }, animate: boole
 			e.part:Destroy()
 		end
 	end
+
+	-- Settled poops are anchored, so anything that was resting ON what we just took
+	-- would hang in the air over the gap. Wake the neighbours and let them fall;
+	-- settle() re-anchors them a tick or two later once they have come to rest.
+	--
+	-- Bounded by the collection radius, because that is where the poops were taken
+	-- from. Auto Collect needs none of this: it clears each poop as it ARRIVES, so
+	-- no heap builds up for one to be resting on.
+	if hrp then
+		local bin = taken[1].part.Parent
+		local wake = Config.collectRadius(profile.upgrades.CollectRadius or 0) + WAKE_MARGIN
+		if bin then
+			for _, q in ipairs(bin:GetChildren()) do
+				if q:IsA("BasePart") and q.Anchored and not q:GetAttribute("Collected") then
+					if (q.Position - hrp.Position).Magnitude <= wake then q.Anchored = false end
+				end
+			end
+		end
+	end
+
 	PickupEvent:FireClient(player, payload, profile.poops, profile.poopItems)
 	DataService.push(player, { poops = profile.poops, poopItems = profile.poopItems })
 
@@ -658,25 +716,57 @@ end
 -- over its guide geometry, so they never actually touch it.
 local areaCache: { [Model]: { cx: number, cz: number, hx: number, hz: number } } = {}
 
-local function hasArrived(plot: Model, poop: BasePart): boolean
-	if poop:GetAttribute("Arrived") then return true end
+-- `pivot` is passed in rather than read here: Model:GetPivot() walks the model to
+-- find its bounding box, and this runs once per poop per tick -- up to 120 of them
+-- on a full plot, for a pivot that is the same every time.
+local function inCollectionArea(plot: Model, pivot: CFrame, poop: BasePart): boolean
 	local box = areaCache[plot]
 	if not box then
 		local base = plot:FindFirstChild("Base")
 		local area = base and base:FindFirstChild("CollectionArea")
 		if not area or not area:IsA("BasePart") then return false end
-		local c = plot:GetPivot():PointToObjectSpace(area.Position)
+		local c = pivot:PointToObjectSpace(area.Position)
 		box = { cx = c.X, cz = c.Z, hx = area.Size.X * 0.5 + 1, hz = area.Size.Z * 0.5 + 1 }
 		areaCache[plot] = box
 	end
-	local l = plot:GetPivot():PointToObjectSpace(poop.Position)
-	if math.abs(l.X - box.cx) > box.hx or math.abs(l.Z - box.cz) > box.hz then
-		return false
-	end
+	local l = pivot:PointToObjectSpace(poop.Position)
+	return math.abs(l.X - box.cx) <= box.hx and math.abs(l.Z - box.cz) <= box.hz
+end
+
+local function hasArrived(plot: Model, pivot: CFrame, poop: BasePart): boolean
+	if poop:GetAttribute("Arrived") then return true end
+	if not inCollectionArea(plot, pivot, poop) then return false end
 	-- still tumbling in off the belt does not count as landed
 	if poop.AssemblyLinearVelocity.Magnitude > 4 then return false end
 	poop:SetAttribute("Arrived", true)
 	return true
+end
+
+-- ── settling ──────────────────────────────────────────────────────────────
+-- A poop that has stopped moving is scenery, but leaving it unanchored keeps it in
+-- the physics solver AND in the network's set of moving parts for as long as it
+-- sits there. A full plot holds 120 of them and six full plots is 720 assemblies
+-- the server re-solves and re-replicates every step, for a heap that is not going
+-- anywhere. That is the cost two full farms were imposing on everyone else.
+--
+-- Anchoring at rest changes nothing visible: CanCollide stays on, so poops still
+-- land ON the heap and it still backs up towards the belt. CanTouch goes off with
+-- it -- nothing connects Touched on a poop, and pickup is a distance test -- which
+-- also drops them out of touch-pair processing.
+local SETTLE_SPEED = 0.75 -- studs/sec: below this it has genuinely come to rest
+local STRAY_AGE = 10 -- one that never reached the area still stops simulating
+
+local function settle(plot: Model, pivot: CFrame, poop: BasePart)
+	if poop.Anchored or poop:GetAttribute("Collected") then return end
+	if poop.AssemblyLinearVelocity.Magnitude > SETTLE_SPEED then return end
+	-- a poop spinning in place has not settled either
+	if poop.AssemblyAngularVelocity.Magnitude > SETTLE_SPEED * 4 then return end
+	-- In the heap is the normal case. The age fallback catches the one that wedged
+	-- against a border barrier and would otherwise be simulated for the whole round.
+	local age = os.clock() - (poop:GetAttribute("Born") or 0)
+	if not (inCollectionArea(plot, pivot, poop) or age > STRAY_AGE) then return end
+	poop.Anchored = true
+	poop.CanTouch = false
 end
 
 -- Every farm is ringed by invisible slabs under Plot*.Border. They are there to
@@ -694,7 +784,9 @@ local function armPoopBarriers(): number
 		local border = plot:FindFirstChild("Border")
 		if not border then continue end
 		for _, part in ipairs(border:GetDescendants()) do
-			if part:IsA("BasePart") and pcall(function() part.CollisionGroup = "PoopWall" end) then
+			if part:IsA("BasePart") and pcall(function()
+				part.CollisionGroup = "PoopWall"
+			end) then
 				part.Anchored = true
 				part.CanCollide = true
 				part.CanQuery = false
@@ -707,9 +799,7 @@ end
 
 function PoopService.init()
 	local armed = armPoopBarriers()
-	if armed == 0 then
-		warn("[PoopService] no Border barriers found -- poops can roll off the farms")
-	end
+	if armed == 0 then warn("[PoopService] no Border barriers found -- poops can roll off the farms") end
 
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
@@ -739,12 +829,16 @@ function PoopService.init()
 			-- Auto Collect instead waits until one has reached the heap and then just
 			-- clears it, so the belt is still visibly doing its job.
 			local near = {}
+			local pivot = plot:GetPivot()
 			for _, q in ipairs(bin:GetChildren()) do
 				if q:IsA("BasePart") and not q:GetAttribute("Collected") then
+					-- take it out of the simulation the moment it stops moving,
+					-- whether or not this player collects automatically
+					settle(plot, pivot, q)
 					local reachable
 					if auto then
 						-- only once it has actually reached the collection area
-						reachable = hasArrived(plot, q)
+						reachable = hasArrived(plot, pivot, q)
 					else
 						reachable = (q.Position - hrp.Position).Magnitude <= radius
 					end
@@ -754,9 +848,7 @@ function PoopService.init()
 					end
 				end
 			end
-			if #near > 0 then
-				PoopService.collect(player, near, not auto)
-			end
+			if #near > 0 then PoopService.collect(player, near, not auto) end
 		end
 	end)
 end
