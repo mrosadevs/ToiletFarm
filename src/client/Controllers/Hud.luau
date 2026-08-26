@@ -13,6 +13,8 @@ local Net = require(Shared.Net)
 local Prices = require(Shared.Prices)
 
 local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 
 local UIKit = require(script.Parent.UIKit)
 local Audio = require(script.Parent.Audio)
@@ -46,6 +48,44 @@ end
 -- What each one advertises scales with the player's balance, so the label has to
 -- be recomputed on every cash change rather than baked in.
 local packs: { Frame } = {}
+
+-- ── mobile: keep Home clear of the Roblox topbar ─────────────────────────
+-- HudScreen_PoopBasket sets IgnoreGuiInset, so the container's top edge is the
+-- true top of the screen and HomeButton is authored flush against it at y = 0.
+-- On desktop Roblox's own controls are narrow enough that Home clears them. On a
+-- phone the topbar is taller and its buttons run further across, so they sit
+-- directly on top of Home and swallow the tap.
+--
+-- Touch-only, so the authored desktop layout is left exactly as it is -- a device
+-- with both touch and a keyboard is a laptop or a Windows tablet and gets the
+-- desktop topbar.
+local TOPBAR_MARGIN = 12 -- design px of breathing room under the inset
+
+local function keepHomeClearOfTopbar(home: GuiObject)
+	if not (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled) then return end
+	local container = home.Parent
+	if not container or not container:IsA("GuiObject") then return end
+	local authoredY = home.Position.Y.Offset
+
+	local function apply()
+		-- GetGuiInset is in real screen pixels, but everything inside the container
+		-- is in unscaled design pixels behind FigBloxUIViewportScale. Convert, or the
+		-- drop is wrong by whatever the viewport scale happens to be.
+		local scale = container:FindFirstChild("FigBloxUIViewportScale") :: UIScale?
+		local k = (scale and scale.Scale > 0) and scale.Scale or 1
+		local inset = GuiService:GetGuiInset().Y / k
+		home.Position = UDim2.new(
+			home.Position.X.Scale,
+			home.Position.X.Offset,
+			home.Position.Y.Scale,
+			authoredY + inset + TOPBAR_MARGIN
+		)
+	end
+
+	apply()
+	-- rotation and resize change both the inset and the viewport scale
+	container:GetPropertyChangedSignal("AbsoluteSize"):Connect(apply)
+end
 
 local function collectPacks()
 	packs = {}
@@ -217,6 +257,7 @@ function Hud.init()
 	-- and had no hover sound.
 	local home = C:FindFirstChild("HomeButton")
 	if home and home:IsA("GuiObject") then
+		keepHomeClearOfTopbar(home)
 		UIKit.makeInteractive(home, function()
 			Audio.play("UiClick")
 			Net.event(Net.NAMES.TeleportHome):FireServer()
