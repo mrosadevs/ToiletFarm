@@ -40,14 +40,28 @@ function PlotService.plotOfInstance(inst: Instance): Model?
 	return n :: Model?
 end
 
+-- Cached per plot and kind. mergeAll asks for the Merge pad to place its burst on,
+-- and the Auto Merge gamepass calls mergeAll from a Heartbeat -- so this walked the
+-- entire farm, poop heap included, potentially every frame. Pads are Studio-authored
+-- and never created at runtime, so the answer cannot change.
+local padsByKind: { [Model]: { [string]: { Model } } } = {}
+
 function PlotService.padsOf(plot: Model, kind: string): { Model }
-	local out = {}
-	for _, d in ipairs(plot:GetDescendants()) do
-		if d:IsA("Model") and d:GetAttribute("PadKind") == kind then
-			table.insert(out, d)
+	local byKind = padsByKind[plot]
+	if not byKind then
+		byKind = {}
+		for _, d in ipairs(plot:GetDescendants()) do
+			if d:IsA("Model") then
+				local k = d:GetAttribute("PadKind")
+				if type(k) == "string" then
+					byKind[k] = byKind[k] or {}
+					table.insert(byKind[k], d)
+				end
+			end
 		end
+		padsByKind[plot] = byKind
 	end
-	return out
+	return byKind[kind] or {}
 end
 
 function PlotService.padOf(plot: Model, kind: string): Model?
@@ -83,9 +97,7 @@ local function stallFrame(stall: Model): (Vector3?, Vector3?, { BasePart })
 	local tall: { BasePart } = {}
 	local tallest = 0
 	for _, p in ipairs(stall:GetChildren()) do
-		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" then
-			tallest = math.max(tallest, p.Size.Y)
-		end
+		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" then tallest = math.max(tallest, p.Size.Y) end
 	end
 	for _, p in ipairs(stall:GetChildren()) do
 		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" and math.abs(p.Size.Y - tallest) < 0.01 then
@@ -100,9 +112,15 @@ local function stallFrame(stall: Model): (Vector3?, Vector3?, { BasePart })
 	for _, a in ipairs(tall) do
 		local matches = 0
 		for _, b in ipairs(tall) do
-			if a ~= b and (a.Size - b.Size).Magnitude < 0.01 then matches += 1 end
+			if a ~= b and (a.Size - b.Size).Magnitude < 0.01 then
+				matches += 1
+			end
 		end
-		if matches >= 1 then table.insert(sides, a) else back = a end
+		if matches >= 1 then
+			table.insert(sides, a)
+		else
+			back = a
+		end
 	end
 	if #sides ~= 2 or not back then return nil, nil, {} end
 
@@ -143,9 +161,7 @@ end
 -- excluded from setStallVisible.
 local function setPillarsVisible(stall: Model, visible: boolean)
 	for _, p in ipairs(stall:GetChildren()) do
-		if p:IsA("BasePart") and p.Name:sub(1, 6) == "Pillar" then
-			p.Transparency = visible and 0 or 1
-		end
+		if p:IsA("BasePart") and p.Name:sub(1, 6) == "Pillar" then p.Transparency = visible and 0 or 1 end
 	end
 end
 
@@ -266,7 +282,9 @@ local function setStallVisible(stall: Model, visible: boolean, animate: boolean)
 	-- Cancel anything still animating before applying the new state.
 	local running = stallTweens[stall]
 	if running then
-		for _, tw in ipairs(running) do tw:Cancel() end
+		for _, tw in ipairs(running) do
+			tw:Cancel()
+		end
 		stallTweens[stall] = nil
 	end
 
@@ -308,7 +326,9 @@ function PlotService.refreshStalls(player: Player)
 	local p = DataService.get(player)
 	if not plot or not p then return end
 	local occupied: { [number]: boolean } = {}
-	for _, t in ipairs(p.toilets) do occupied[t.slot] = true end
+	for _, t in ipairs(p.toilets) do
+		occupied[t.slot] = true
+	end
 	for _, stall in ipairs(plot.Stalls:GetChildren()) do
 		local slot = stall:GetAttribute("Slot") :: number
 		setStallVisible(stall, occupied[slot] == true, true)
@@ -337,7 +357,8 @@ local function applyMutationLook(model: Model, mut: string)
 			h.Parent = model
 		elseif d:IsA("ParticleEmitter") then
 			local a = target:FindFirstChild("MutFx") or Instance.new("Attachment")
-			a.Name = "MutFx"; a.Parent = target
+			a.Name = "MutFx"
+			a.Parent = target
 			d:Clone().Parent = a
 		end
 	end
@@ -379,7 +400,11 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 	model:SetAttribute("Mutation", mut)
 	model:SetAttribute("Slot", slot)
 	for _, p in ipairs(model:GetDescendants()) do
-		if p:IsA("BasePart") then p.Anchored = true; p.CanCollide = false; p.CanQuery = false end
+		if p:IsA("BasePart") then
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanQuery = false
+		end
 	end
 
 	-- Fit the model to the stall. These assets carry a ±90° yaw and pivots that are
@@ -437,7 +462,9 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 		name.TextColor3 = Config.RARITY_COLORS[Config.rarityOf(tier)]
 		name.Text = (mut ~= "None" and (mut .. " ") or "") .. Config.displayName(tier)
 		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 2.5; stroke.Color = Color3.new(0, 0, 0); stroke.Parent = name
+		stroke.Thickness = 2.5
+		stroke.Color = Color3.new(0, 0, 0)
+		stroke.Parent = name
 		name.Parent = bb
 		local tierLabel = Instance.new("TextLabel")
 		tierLabel.Size = UDim2.fromScale(1, 0.34)
@@ -448,7 +475,9 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 		tierLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
 		tierLabel.Text = "Tier " .. tier
 		local s2 = Instance.new("UIStroke")
-		s2.Thickness = 2; s2.Color = Color3.new(0, 0, 0); s2.Parent = tierLabel
+		s2.Thickness = 2
+		s2.Color = Color3.new(0, 0, 0)
+		s2.Parent = tierLabel
 		tierLabel.Parent = bb
 		bb.Adornee = head
 		bb.Parent = head
@@ -483,7 +512,10 @@ end
 
 function PlotService.clearToilet(plot: Model, slot: number)
 	local m = placed[plot] and placed[plot][slot]
-	if m then m:Destroy(); placed[plot][slot] = nil end
+	if m then
+		m:Destroy()
+		placed[plot][slot] = nil
+	end
 	local stall = PlotService.stall(plot, slot)
 	if stall then setStallVisible(stall, false, false) end
 	refreshPillarsUnder(plot, slot, false)
@@ -509,7 +541,9 @@ function PlotService.freeSlot(player: Player): number?
 	local p = DataService.get(player)
 	if not p then return nil end
 	local used = {}
-	for _, t in ipairs(p.toilets) do used[t.slot] = true end
+	for _, t in ipairs(p.toilets) do
+		used[t.slot] = true
+	end
 	for s = 1, DataService.slots(player) do
 		if not used[s] then return s end
 	end
@@ -525,8 +559,11 @@ local headshots: { [number]: string } = {}
 local function headshotFor(userId: number): string?
 	if headshots[userId] then return headshots[userId] end
 	local ok, url = pcall(function()
-		return Players:GetUserThumbnailAsync(userId,
-			Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+		return Players:GetUserThumbnailAsync(
+			userId,
+			Enum.ThumbnailType.HeadShot,
+			Enum.ThumbnailSize.Size150x150
+		)
 	end)
 	if ok and type(url) == "string" then
 		headshots[userId] = url
@@ -567,7 +604,9 @@ local function nameplateFor(plot: Model, player: Player?)
 		sign.Name = "OwnerSign"
 		sign.Size = Vector3.new(1, 1, 1)
 		sign.Transparency = 1
-		sign.Anchored = true; sign.CanCollide = false; sign.CanQuery = false
+		sign.Anchored = true
+		sign.CanCollide = false
+		sign.CanQuery = false
 		sign.CastShadow = false
 
 		local bb = Instance.new("BillboardGui")
@@ -605,7 +644,9 @@ local function nameplateFor(plot: Model, player: Player?)
 		lbl.TextScaled = true
 		lbl.TextColor3 = Color3.new(1, 1, 1)
 		local st = Instance.new("UIStroke")
-		st.Thickness = 3; st.Color = Color3.new(0, 0, 0); st.Parent = lbl
+		st.Thickness = 3
+		st.Color = Color3.new(0, 0, 0)
+		st.Parent = lbl
 		lbl.Parent = bb
 
 		bb.Parent = sign
@@ -668,7 +709,9 @@ function PlotService.release(player: Player)
 	local plot = plotOf[player]
 	if not plot then return end
 	plot:SetAttribute("OwnerUserId", 0)
-	for slot, m in pairs(placed[plot] or {}) do m:Destroy() end
+	for slot, m in pairs(placed[plot] or {}) do
+		m:Destroy()
+	end
 	placed[plot] = {}
 	for _, stall in ipairs(plot.Stalls:GetChildren()) do
 		setStallVisible(stall, false, false)
@@ -730,7 +773,7 @@ function PlotService.init()
 		growStalls(plot)
 		stackStalls(plot)
 		for _, stall in ipairs(plot.Stalls:GetChildren()) do
-			stall:SetAttribute("Unlocked", true)   -- force setStallVisible to actually run
+			stall:SetAttribute("Unlocked", true) -- force setStallVisible to actually run
 			setStallVisible(stall, false, false)
 			setPillarsVisible(stall, false)
 		end

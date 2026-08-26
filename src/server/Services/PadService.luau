@@ -13,11 +13,11 @@ local Format = require(Shared.Format)
 local Net = require(Shared.Net)
 local Prices = require(Shared.Prices)
 
-local DataService     = require(script.Parent.DataService)
-local PlotService     = require(script.Parent.PlotService)
-local ToiletService   = require(script.Parent.ToiletService)
-local EconomyService  = require(script.Parent.EconomyService)
-local PassService     = require(script.Parent.PassService)
+local DataService = require(script.Parent.DataService)
+local PlotService = require(script.Parent.PlotService)
+local ToiletService = require(script.Parent.ToiletService)
+local EconomyService = require(script.Parent.EconomyService)
+local PassService = require(script.Parent.PassService)
 local TutorialService = require(script.Parent.TutorialService)
 
 local PadService = {}
@@ -57,7 +57,10 @@ local function isGroupMember(player: Player, allowRefresh: boolean?): boolean
 	end)
 	if ok and type(groups) == "table" then
 		for _, g in ipairs(groups) do
-			if g.Id == GROUP_ID then member = true break end
+			if g.Id == GROUP_ID then
+				member = true
+				break
+			end
 		end
 	end
 	groupCache[player] = { member = member, at = os.clock() }
@@ -67,8 +70,13 @@ end
 -- A floor under deliberate re-steps only; the real once-per-step guard is the
 -- contact counting in bindPlate.
 local COOLDOWN = {
-	BuyButton = 0.25, MergePad = 0.5, DepositPad = 0.35, CollectCashPad = 0.25,
-	RebirthPad = 1.0, FreeMoneyPad = 1.0, ProcessingPad = 0.4,
+	BuyButton = 0.25,
+	MergePad = 0.5,
+	DepositPad = 0.35,
+	CollectCashPad = 0.25,
+	RebirthPad = 1.0,
+	FreeMoneyPad = 1.0,
+	ProcessingPad = 0.4,
 }
 local DEFAULT_COOLDOWN = 0.6
 
@@ -92,15 +100,33 @@ end
 -- `SubLabel` is the small grey caption above the main one on pads that have two
 -- (the Buy 100 pad's "(Auto Merge)"). It used to be a second label also called
 -- Quantity, so this loop overwrote it and the pad read "Buy 100 Toilets" twice.
-local function labels(pad: Model): (TextLabel?, TextLabel?, TextLabel?)
+-- Resolved once per pad. This is called for every pad on the owner's plot four
+-- times a second, and a pad's labels do not move once the place has loaded.
+local labelCache: { [Model]: { TextLabel? } } = {}
+
+local function findLabels(pad: Model): (TextLabel?, TextLabel?, TextLabel?)
 	local quantity, price, sub
 	for _, d in ipairs(pad:GetDescendants()) do
 		if d:IsA("TextLabel") then
-			if d.Name == "Quantity" then quantity = d
-			elseif d.Name == "Price" then price = d
-			elseif d.Name == "SubLabel" then sub = d end
+			if d.Name == "Quantity" then
+				quantity = d
+			elseif d.Name == "Price" then
+				price = d
+			elseif d.Name == "SubLabel" then
+				sub = d
+			end
 		end
 	end
+	return quantity, price, sub
+end
+
+local function labels(pad: Model): (TextLabel?, TextLabel?, TextLabel?)
+	local hit = labelCache[pad]
+	-- A cached label whose ancestry has been torn out is stale; re-read rather than
+	-- writing Text to an orphan for the rest of the session.
+	if hit and (hit[1] == nil or hit[1].Parent ~= nil) then return hit[1], hit[2], hit[3] end
+	local quantity, price, sub = findLabels(pad)
+	labelCache[pad] = { quantity, price, sub }
 	return quantity, price, sub
 end
 
@@ -132,19 +158,58 @@ local function paint(pad: Model, state: string)
 		button:SetAttribute("ReadyColor", authored)
 	end
 
-	local want = (state == PAD.denied and DENIED)
-		or (state == PAD.inactive and INACTIVE)
-		or authored
+	local want = (state == PAD.denied and DENIED) or (state == PAD.inactive and INACTIVE) or authored
 	-- guarded: this runs 4x a second per pad, and an unchanged write still replicates
 	if button.Color ~= want then button.Color = want end
 end
 
 -- pads that sell a gamepass or dev product, and which one
 local ROBUX_PADS = {
-	AutoPoopPad  = { kind = "pass",    id = "AutoFlush",        label = "Auto Collect Poops" },
-	AutoCashPad  = { kind = "pass",    id = "AutoCash",         label = "Auto Collect Cash"  },
-	FinishNowPad = { kind = "product", id = "FinishProcessing", label = "Finish Now"         },
+	AutoPoopPad = { kind = "pass", id = "AutoFlush", label = "Auto Collect Poops" },
+	AutoCashPad = { kind = "pass", id = "AutoCash", label = "Auto Collect Cash" },
+	FinishNowPad = { kind = "product", id = "FinishProcessing", label = "Finish Now" },
 }
+
+-- ── the pad index ────────────────────────────────────────────────────────
+-- Both label loops used to find their pads with plot:GetDescendants(). That walk
+-- returns the WHOLE farm -- every stall, every toilet (23 parts each) and up to 120
+-- world poops -- so on a full plot it visited around three thousand instances, four
+-- times a second, per player. The fuller two farms got, the more every OTHER player
+-- in the server paid for it, which is exactly the shape of the lag at 4+ players.
+--
+-- Pads are authored in Studio and are neither created nor destroyed at runtime
+-- (seatPlotPads only moves them, ensureBillboard only adds a board inside one), so
+-- the set on a plot is fixed once the place has loaded. Walk each plot once.
+local padIndex: { [Model]: { Model } } = {}
+local robuxIndex: { [Model]: { Model } } = {}
+
+local function indexPlot(plot: Model)
+	local pads, robux = {}, {}
+	for _, d in ipairs(plot:GetDescendants()) do
+		if d:IsA("Model") and d:GetAttribute("PadKind") then
+			table.insert(pads, d)
+			if ROBUX_PADS[d:GetAttribute("PadKind")] then table.insert(robux, d) end
+		end
+	end
+	padIndex[plot] = pads
+	robuxIndex[plot] = robux
+end
+
+local function padsOnPlot(plot: Model): { Model }
+	if not padIndex[plot] then indexPlot(plot) end
+	return padIndex[plot]
+end
+
+local function robuxPadsOnPlot(plot: Model): { Model }
+	if not robuxIndex[plot] then indexPlot(plot) end
+	return robuxIndex[plot]
+end
+
+-- Sell glow / touch zone and the FlushMeter board, resolved once per plot for the
+-- same reason: both were found with a RECURSIVE FindFirstChild, which in the worst
+-- case is a full walk of the farm, five times a second per player.
+local sellCache: { [Model]: { BasePart? } } = {}
+local signCache: { [Model]: Instance? } = {}
 
 local function refreshPad(pad: Model, player: Player)
 	local kind = pad:GetAttribute("PadKind")
@@ -185,7 +250,6 @@ local function refreshPad(pad: Model, player: Player)
 		else
 			paint(pad, p.cash >= cost and PAD.ready or PAD.denied)
 		end
-
 	elseif kind == "DepositPad" then
 		-- items, matching the basket gauge and the "Deposited X Poops!" banner; this
 		-- used to quote p.poops (the cash value), so the three disagreed
@@ -209,16 +273,17 @@ local function refreshPad(pad: Model, player: Player)
 			paint(pad, PAD.inactive) -- no amount of cash opens this until you rebirth
 		else
 			if quantity then
-				quantity.Text = ("Upgrade Buy Tier\n%s > %s")
-					:format(Config.displayName(tier), Config.displayName(tier + 1))
+				quantity.Text = ("Upgrade Buy Tier\n%s > %s"):format(
+					Config.displayName(tier),
+					Config.displayName(tier + 1)
+				)
 			end
 			local need = Config.buyTierRequirement(tier)
 			local owned = ToiletService.totalToilets(player)
 			local cost = Config.buyTierCost(tier)
 			local hasToilets = owned >= need
 			if price then
-				price.Text = hasToilets
-					and ("$" .. Format.cash(cost))
+				price.Text = hasToilets and ("$" .. Format.cash(cost))
 					or ("%s / %s Toilets"):format(Format.short(owned), Format.short(need))
 			end
 			-- it costs toilets AND cash, and either shortfall is "you cannot buy this yet"
@@ -235,8 +300,7 @@ local function refreshPad(pad: Model, player: Player)
 			local left = EconomyService.groupRewardCooldown(player)
 			if quantity then quantity.Text = "Group Reward" end
 			if price then
-				price.Text = left > 0
-					and ("Ready in %d:%02d"):format(left // 60, left % 60)
+				price.Text = left > 0 and ("Ready in %d:%02d"):format(left // 60, left % 60)
 					or ("$" .. Format.cash(Config.groupReward(p.cash)))
 			end
 			paint(pad, left > 0 and PAD.inactive or PAD.ready)
@@ -251,7 +315,6 @@ local function refreshPad(pad: Model, player: Player)
 		-- no hologram: this pad has its own FreeMoneySign board, and the billboard
 		-- floated high above the septic area where it read as a stray label
 	end
-
 end
 
 -- A Robux price is the same number for everybody, so these pads are refreshed on
@@ -266,9 +329,7 @@ local function refreshRobuxPad(pad: Model, owner: Player?)
 	local isPass = robux.kind == "pass"
 	-- the buyer price, not GetProductInfo's creator-set value
 	local robuxPrice = isPass and Prices.pass(robux.id) or Prices.product(robux.id)
-	local exists = isPass
-		and PassService.passId(robux.id) ~= 0
-		or PassService.productId(robux.id) ~= 0
+	local exists = isPass and PassService.passId(robux.id) ~= 0 or PassService.productId(robux.id) ~= 0
 
 	if quantity then
 		local owned = isPass and owner ~= nil and PassService.has(owner, robux.id)
@@ -287,7 +348,12 @@ end
 
 -- The "Selling Poop… / N per second" board over the processing area.
 local function refreshSellingSign(plot: Model, player: Player)
-	local sign = plot:FindFirstChild("FlushMeterSign", true)
+	local sign = signCache[plot]
+	if not sign or sign.Parent == nil then
+		-- recursive, so it is a walk of the farm; do it once and hold on to the board
+		sign = plot:FindFirstChild("FlushMeterSign", true)
+		signCache[plot] = sign
+	end
 	if not sign then return end
 	-- the COUNT, so the sign agrees with the basket and the "Deposited N Poops!"
 	-- banner rather than quoting the queue's cash value under the word Poops
@@ -301,7 +367,14 @@ local function refreshSellingSign(plot: Model, player: Player)
 				d.Text = Format.short(EconomyService.processItemRate(player)) .. " per second"
 			elseif d.Name == "FriendBoost" then
 				d.Text = friends > 0
-					and ("(+%d%% Friend Boost)"):format(math.floor(math.min(friends * Config.PROCESSING.friendBoost, Config.PROCESSING.maxFriendBoost) * 100))
+						and ("(+%d%% Friend Boost)"):format(
+							math.floor(
+								math.min(
+									friends * Config.PROCESSING.friendBoost,
+									Config.PROCESSING.maxFriendBoost
+								) * 100
+							)
+						)
 					or "(No Friend Boost)"
 			elseif d.Name == "Header" then
 				d.Text = queued > 0 and "Selling Poop..." or "Nothing Selling"
@@ -419,8 +492,8 @@ local function promptPass(passName: string)
 	end
 end
 
-handlers.AutoPoopPad  = promptPass("AutoFlush")
-handlers.AutoCashPad  = promptPass("AutoCash")
+handlers.AutoPoopPad = promptPass("AutoFlush")
+handlers.AutoCashPad = promptPass("AutoCash")
 handlers.AutoMergePad = promptPass("AutoMerge")
 
 -- ── wiring ──────────────────────────────────────────────────────────────
@@ -436,7 +509,9 @@ local function bindPlate(plate: BasePart)
 	if plate:GetAttribute("PadBound") then return end
 	plate:SetAttribute("PadBound", true)
 	local pad = plate.Parent
-	while pad and not pad:GetAttribute("PadKind") do pad = pad.Parent end
+	while pad and not pad:GetAttribute("PadKind") do
+		pad = pad.Parent
+	end
 	if not pad then return end
 	local padModel = pad :: Model
 
@@ -461,9 +536,7 @@ local function bindPlate(plate: BasePart)
 
 		local kind = padModel:GetAttribute("PadKind") :: string
 		local handler = handlers[kind]
-		if handler then
-			task.spawn(handler, player, padModel)
-		end
+		if handler then task.spawn(handler, player, padModel) end
 	end)
 
 	plate.TouchEnded:Connect(function(hit)
@@ -479,12 +552,15 @@ end
 -- The glow reports what is happening — green while banking, red when you have
 -- nothing left, blue when idle.
 local SELL_GLOW = {
-	idle  = Color3.fromRGB(  9, 158, 222),
-	ok    = Color3.fromRGB( 60, 220,  70),
-	empty = Color3.fromRGB(230,  60,  60),
+	idle = Color3.fromRGB(9, 158, 222),
+	ok = Color3.fromRGB(60, 220, 70),
+	empty = Color3.fromRGB(230, 60, 60),
 }
 
 local function sellParts(plot: Model): (BasePart?, BasePart?)
+	local hit = sellCache[plot]
+	if hit and (hit[1] == nil or hit[1].Parent ~= nil) then return hit[1], hit[2] end
+
 	local sell = plot:FindFirstChild("Sell", true)
 	if not sell then return nil, nil end
 	local glow, zone
@@ -494,6 +570,7 @@ local function sellParts(plot: Model): (BasePart?, BasePart?)
 			if not zone and d.Name == "TouchZone" then zone = d end
 		end
 	end
+	sellCache[plot] = { glow, zone }
 	return glow, zone
 end
 
@@ -520,9 +597,7 @@ function PadService.runSellZone()
 				if hrp and insideZone(zone, hrp.Position) then
 					if p.poops > 0 then
 						local banked = EconomyService.deposit(player)
-						if banked and banked > 0 then
-							TutorialService.notify(player, "deposit", 1)
-						end
+						if banked and banked > 0 then TutorialService.notify(player, "deposit", 1) end
 						state = "ok"
 					else
 						state = "empty"
@@ -585,15 +660,11 @@ local function seatPlotPads()
 			local pivot = plot:GetPivot()
 
 			local group = padOfKind(plot, "GroupJoinPad")
-			if group then
-				group:PivotTo(pivot * (signRel :: CFrame))
-			end
+			if group then group:PivotTo(pivot * (signRel :: CFrame)) end
 
 			-- shifted clear of the group pad; their touch volumes are 6-7 studs across
 			local rebirth = padOfKind(plot, "RebirthPad")
-			if rebirth then
-				rebirth:PivotTo(pivot * ((signRel :: CFrame) + REBIRTH_PAD_OFFSET))
-			end
+			if rebirth then rebirth:PivotTo(pivot * ((signRel :: CFrame) + REBIRTH_PAD_OFFSET)) end
 		end
 	end
 end
@@ -608,7 +679,9 @@ local function ensureBillboard(pad: Model, seedQuantity: string, seedPrice: stri
 	end
 	local plots = workspace:FindFirstChild("Plots")
 	local plot = pad.Parent
-	while plot and plot.Parent ~= plots do plot = plot.Parent end
+	while plot and plot.Parent ~= plots do
+		plot = plot.Parent
+	end
 	if not plot then return end
 
 	-- Prefer one specific neighbour: whichever Text attachment turns up first varies
@@ -669,7 +742,9 @@ function PadService.init()
 	Players.PlayerRemoving:Connect(function(player)
 		lastTouch[player] = nil
 		groupCache[player] = nil
-		for _, contacts in pairs(occupancy) do contacts[player] = nil end
+		for _, contacts in pairs(occupancy) do
+			contacts[player] = nil
+		end
 	end)
 
 	-- A dropped TouchEnded (respawn, ragdoll, teleport off the pad) would otherwise
@@ -701,10 +776,8 @@ function PadService.init()
 		while true do
 			for _, plot in ipairs(workspace.Plots:GetChildren()) do
 				local owner = PlotService.ownerOfPlot(plot)
-				for _, d in ipairs(plot:GetDescendants()) do
-					if d:IsA("Model") and ROBUX_PADS[d:GetAttribute("PadKind")] then
-						pcall(refreshRobuxPad, d, owner)
-					end
+				for _, d in ipairs(robuxPadsOnPlot(plot :: Model)) do
+					pcall(refreshRobuxPad, d, owner)
 				end
 			end
 			task.wait(2)
@@ -719,16 +792,19 @@ function PadService.init()
 				local plot = PlotService.plotFor(player)
 				local p = DataService.get(player)
 				if not plot or not p then continue end
-				for _, d in ipairs(plot:GetDescendants()) do
-					if d:IsA("Model") and d:GetAttribute("PadKind") then
-						-- One pad throwing used to kill this whole loop, which left every
-						-- billboard stuck on its baked mockup text ("Auto Collect / 64").
-						local ok, err = pcall(refreshPad, d, player)
-						if not ok and not warned[d] then
-							warned[d] = true
-							warn(("[PadService] refresh failed for %s (%s): %s")
-								:format(d.Name, tostring(d:GetAttribute("PadKind")), tostring(err)))
-						end
+				for _, d in ipairs(padsOnPlot(plot)) do
+					-- One pad throwing used to kill this whole loop, which left every
+					-- billboard stuck on its baked mockup text ("Auto Collect / 64").
+					local ok, err = pcall(refreshPad, d, player)
+					if not ok and not warned[d] then
+						warned[d] = true
+						warn(
+							("[PadService] refresh failed for %s (%s): %s"):format(
+								d.Name,
+								tostring(d:GetAttribute("PadKind")),
+								tostring(err)
+							)
+						)
 					end
 				end
 				refreshSellingSign(plot, player)
