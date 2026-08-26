@@ -44,6 +44,7 @@ local function buildTemplate(tier: number): BasePart
 		p.Shape = Enum.PartType.Ball
 		p.Size = Vector3.new(1.5, 1.5, 1.5)
 		p.Color = Color3.fromRGB(105, 70, 40)
+		p.CastShadow = false
 		return p
 	end
 
@@ -81,6 +82,7 @@ local function buildTemplate(tier: number): BasePart
 		p.Shape = Enum.PartType.Ball
 		p.Size = Vector3.new(1.5, 1.5, 1.5)
 		p.Color = Color3.fromRGB(105, 70, 40)
+		p.CastShadow = false
 		return p
 	end
 
@@ -112,6 +114,10 @@ local function buildTemplate(tier: number): BasePart
 		-- Velocity, so a free body resting on one is carried along for free.
 		part.Anchored = false
 		part.CanQuery = false
+		-- No shadow. A full farm holds 120 of these and there are six farms, so this
+		-- is a few hundred shadow casters for litter on the floor -- and set on the
+		-- cached TEMPLATE, so it costs nothing per drop.
+		part.CastShadow = false
 		-- only the root collides and is touchable; decorations are cosmetic, so an
 		-- irregular silhouette can never wedge a poop on the belt
 		part.CanCollide = isRoot

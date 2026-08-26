@@ -383,6 +383,9 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number): Model
 			p.Anchored = true
 			p.CanCollide = false
 			p.CanQuery = false
+			-- No shadow. A toilet averages 24 parts and a full plot holds 48 of them,
+			-- inside stalls that already shade what is under them.
+			p.CastShadow = false
 		end
 	end
 
@@ -422,6 +425,7 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number): Model
 	head.CanQuery = false
 	head.CanTouch = false
 	head.Massless = true
+	head.CastShadow = false
 	head.CFrame = CFrame.new(topCF.Position + Vector3.new(0, topSize.Y / 2, 0))
 	head.Parent = model
 	do
