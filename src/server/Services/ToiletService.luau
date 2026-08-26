@@ -60,6 +60,14 @@ function ToiletService.bestAffordableTier(player: Player): (number?, number?)
 	return tier, Config.buyCostFor(tier, ToiletService.totalToilets(player), DataService.poopRateBase(player))
 end
 
+-- The price a pad press should be held to: the same figure refreshPad puts on the
+-- label, resolved at the moment of the press.
+function ToiletService.quoteFor(player: Player, amount: number): (number?, number?, number?)
+	local tier, unit = ToiletService.bestAffordableTier(player)
+	if not tier or not unit then return nil, nil, nil end
+	return tier, unit, unit * math.clamp(math.floor(tonumber(amount) or 1), 1, 100)
+end
+
 -- what the button should display: tier and unit price of the next purchase
 function ToiletService.buyPreview(player: Player, amount: number): (number, number, number)
 	local p = DataService.get(player)
@@ -112,7 +120,15 @@ local function compactSlots(player: Player): boolean
 	return moved
 end
 
-function ToiletService.buy(player: Player, amount: number)
+-- `unitPrice`, when supplied, is the figure the pad was ADVERTISING when the
+-- player stepped on it, and every toilet in the press is charged at it.
+--
+-- Without it, a bulk press was quoted afresh on each call: the Buy 100 pad merges
+-- and calls back in up to forty-one times, and merging raises the farm's output,
+-- which raises the price floor. A player quoted $6,524 a toilet was being charged
+-- $9,497 a toilet by the second batch of the SAME press. Quoting once is what the
+-- pad's own label promises -- "Buy 25" being exactly 25x the "Buy 1" figure.
+function ToiletService.buy(player: Player, amount: number, unitPrice: number?)
 	local p = DataService.get(player)
 	local plot = PlotService.plotFor(player)
 	if not p or not plot then return end
@@ -121,6 +137,7 @@ function ToiletService.buy(player: Player, amount: number)
 	-- quote the price once for the whole batch
 	local quotedTier, quotedCost = ToiletService.bestAffordableTier(player)
 	if not quotedTier or not quotedCost then return end
+	if unitPrice then quotedCost = unitPrice end
 
 	local bought, spent, lastTier = 0, 0, nil
 	for _ = 1, amount do

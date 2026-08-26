@@ -388,7 +388,29 @@ local handlers: { [string]: (Player, Model) -> () } = {}
 
 handlers.BuyButton = function(player, pad)
 	local amount = pad:GetAttribute("BuyAmount") or 1
-	local bought = ToiletService.buy(player, amount)
+	local p = DataService.get(player)
+	if not p then return end
+
+	-- Quote ONCE, and hold the whole press to it. Everything below charges this
+	-- unit price, so the player pays exactly the figure on the label.
+	local _, unit, total = ToiletService.quoteFor(player, amount)
+	if not unit or not total then return end
+
+	-- refreshPad already paints this pad red when the balance will not cover the
+	-- label. That was cosmetic: stepping on a red pad still bought a PARTIAL batch
+	-- and took most of the balance for it -- a player holding $509,000 in front of
+	-- a pad reading "Buy 100 Toilets  $652,400" was charged $500,285 for 58. The
+	-- pad's own advertised state is now what actually happens.
+	if p.cash < total then
+		Net.event(Net.NAMES.Toast):FireClient(
+			player,
+			("Not enough cash — %d toilets costs $%s"):format(amount, Format.cash(total)),
+			"error"
+		)
+		return
+	end
+
+	local bought = ToiletService.buy(player, amount, unit)
 	if bought and bought > 0 then
 		TutorialService.notify(player, "buy", bought)
 		TutorialService.syncCounts(player)
@@ -400,7 +422,7 @@ handlers.BuyButton = function(player, pad)
 			for _ = 1, 40 do
 				if placed >= amount then break end
 				ToiletService.mergeAll(player)
-				local more = ToiletService.buy(player, amount - placed)
+				local more = ToiletService.buy(player, amount - placed, unit)
 				if not more or more <= 0 then break end
 				placed += more
 			end
