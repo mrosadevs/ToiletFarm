@@ -59,9 +59,17 @@ function WorldFx.bindPads()
 		local plate = nil
 		local bestVol = -1
 		for _, c in ipairs(pad:GetChildren()) do
-			if c:IsA("BasePart") and c.Name ~= "Plate" and c.Name ~= "TouchZone" and c.Name ~= "TextAnchor" then
+			if
+				c:IsA("BasePart")
+				and c.Name ~= "Plate"
+				and c.Name ~= "TouchZone"
+				and c.Name ~= "TextAnchor"
+			then
 				local v = c.Size.X * c.Size.Y * c.Size.Z
-				if v > bestVol then bestVol = v; plate = c end
+				if v > bestVol then
+					bestVol = v
+					plate = c
+				end
 			end
 		end
 		plate = plate or pad:FindFirstChild("Plate")
@@ -72,8 +80,158 @@ function WorldFx.bindPads()
 			springPad(plate)
 		end)
 	end
-	for _, z in ipairs(CollectionService:GetTagged("PadTouch")) do bind(z) end
+	for _, z in ipairs(CollectionService:GetTagged("PadTouch")) do
+		bind(z)
+	end
 	CollectionService:GetInstanceAddedSignal("PadTouch"):Connect(bind)
+end
+
+-- ── reveal animations ────────────────────────────────────────────────────
+-- Stalls fading in and toilets popping in used to be animated on the SERVER, a
+-- property write per part per frame. A toilet is around 24 parts and the bounce
+-- ran for a third of a second, so a single toilet cost roughly 900 replicated
+-- property writes -- and "Buy 25" fired twenty-five of those at once. Character
+-- movement shares the replication queue those writes go into, which is why other
+-- players' avatars locked up on a busy server.
+--
+-- The server now writes the final state once and tags the instance with a
+-- timestamp. Everything below is local: it never replicates, it costs the server
+-- nothing, and a client that skips it still sees a correct, fully sized farm.
+local REVEAL_TAG = "TfReveal"
+local REVEAL_AT = "TfRevealAt"
+
+-- Past this, the cue is history rather than an event: an instance streaming in
+-- long after it was placed must not replay its arrival.
+local REVEAL_GRACE = 2
+
+local STALL_FADE = 0.35
+local POP_TIME = 0.32
+
+-- one animation per instance, so a re-cue supersedes rather than fights
+local revealRun: { [Instance]: number } = {}
+
+local function generation(inst: Instance): number
+	local n = (revealRun[inst] or 0) + 1
+	revealRun[inst] = n
+	return n
+end
+
+local function fresh(inst: Instance): boolean
+	local at = inst:GetAttribute(REVEAL_AT)
+	if type(at) ~= "number" then return false end
+	return workspace:GetServerTimeNow() - at <= REVEAL_GRACE
+end
+
+-- Fade a stall in from invisible. The server has already written the final
+-- Transparency, so this walks BACK to 1 and returns; if it is interrupted the
+-- final frame still restores exactly what the server said.
+local function playStallFade(stall: Model)
+	local gen = generation(stall)
+	local parts: { BasePart } = {}
+	for _, d in ipairs(stall:GetDescendants()) do
+		if d:IsA("BasePart") and d.Name ~= "ToiletSpot" and d.Name:sub(1, 6) ~= "Pillar" then
+			table.insert(parts, d)
+		end
+	end
+	if #parts == 0 then return end
+
+	-- Fade to a literal 0, not to the part's CURRENT Transparency. The server writes
+	-- 0 and then cues, and those are two separate replicated messages: reading the
+	-- property here can race ahead of that write, capture 1, fade 1 -> 1, and leave
+	-- the stall pinned invisible on this client forever, since the server has no
+	-- reason to write it again.
+	for _, part in ipairs(parts) do
+		part.Transparency = 1
+	end
+
+	task.spawn(function()
+		local t0 = os.clock()
+		while revealRun[stall] == gen do
+			local a = (os.clock() - t0) / STALL_FADE
+			if a >= 1 or stall.Parent == nil then break end
+			for _, part in ipairs(parts) do
+				if part.Parent then part.Transparency = 1 - a end
+			end
+			task.wait()
+		end
+		-- Land on the server's value whether we finished or were superseded.
+		if revealRun[stall] == gen then
+			for _, part in ipairs(parts) do
+				if part.Parent then part.Transparency = 0 end
+			end
+		end
+	end)
+end
+
+-- Cancel a fade in flight and snap to whatever the server currently says. Used
+-- when a stall is hidden again mid-reveal -- on a bulk buy the merge runs in the
+-- same frame as the buy, so a stall can be freed a few frames after being shown.
+local function cancelStallFade(stall: Model)
+	if revealRun[stall] == nil then return end
+	generation(stall)
+	for _, d in ipairs(stall:GetDescendants()) do
+		if d:IsA("BasePart") and d.Name ~= "ToiletSpot" and d.Name:sub(1, 6) ~= "Pillar" then
+			-- The server wrote Transparency before clearing the cue, so replicated
+			-- state is already correct; this only undoes our own local override.
+			d.Transparency = stall:GetAttribute("Unlocked") == true and 0 or 1
+		end
+	end
+end
+
+-- The toilet's overshoot-and-settle bounce. ScaleTo is absolute against the
+-- model's ORIGINAL authored size, so this animates towards the FITTED scale the
+-- server left it at, never towards 1.
+local function playToiletPop(model: Model)
+	local gen = generation(model)
+	local fitted = model:GetScale()
+	task.spawn(function()
+		local t0 = os.clock()
+		while revealRun[model] == gen do
+			local a = (os.clock() - t0) / POP_TIME
+			if a >= 1 or model.Parent == nil then break end
+			local e = 1 + 2.2 * (1 - a) ^ 2 * math.sin(a * 9)
+			model:ScaleTo(math.max(0.01, fitted * a * e))
+			task.wait()
+		end
+		if model.Parent and revealRun[model] == gen then model:ScaleTo(fitted) end
+	end)
+end
+
+local function onCue(inst: Instance)
+	if not inst:IsA("Model") then return end
+	if inst.Name == "Toilet" then
+		-- a toilet is only ever cued once, at the moment it is placed
+		if fresh(inst) then playToiletPop(inst) end
+	elseif inst.Name:sub(1, 6) == "Stall_" then
+		if fresh(inst) then
+			playStallFade(inst)
+		else
+			cancelStallFade(inst)
+		end
+	end
+end
+
+function WorldFx.initReveals()
+	local bound: { [Instance]: boolean } = {}
+	local function bind(inst: Instance)
+		if bound[inst] then return end
+		bound[inst] = true
+		-- A stall is cued repeatedly over a session -- shown, hidden, shown again --
+		-- so watch the attribute rather than only the moment the tag appears.
+		inst:GetAttributeChangedSignal(REVEAL_AT):Connect(function()
+			onCue(inst)
+		end)
+		onCue(inst)
+	end
+
+	for _, inst in ipairs(CollectionService:GetTagged(REVEAL_TAG)) do
+		bind(inst)
+	end
+	CollectionService:GetInstanceAddedSignal(REVEAL_TAG):Connect(bind)
+	CollectionService:GetInstanceRemovedSignal(REVEAL_TAG):Connect(function(inst)
+		bound[inst] = nil
+		revealRun[inst] = nil
+	end)
 end
 
 -- ── cash orbs ───────────────────────────────────────────────────────────
@@ -211,9 +369,7 @@ function WorldFx.bindPlotSounds()
 		end
 
 		plot.ChildAdded:Connect(function(child)
-			if child.Name == "LuckyBlock" then
-				Audio.play("LuckySpawn")
-			end
+			if child.Name == "LuckyBlock" then Audio.play("LuckySpawn") end
 		end)
 	end)
 end
@@ -223,8 +379,14 @@ end
 -- exist on the client — a server-side mute never sees them. We play our own
 -- FootstepL/R, so drop the vanilla layer entirely.
 local STOCK_SOUNDS = {
-	Running = true, Landing = true, FreeFalling = true, Jumping = true,
-	GettingUp = true, Climbing = true, Swimming = true, Splash = true,
+	Running = true,
+	Landing = true,
+	FreeFalling = true,
+	Jumping = true,
+	GettingUp = true,
+	Climbing = true,
+	Swimming = true,
+	Splash = true,
 }
 
 local function muteStockSounds(character: Model)
@@ -239,16 +401,22 @@ local function muteStockSounds(character: Model)
 			end)
 		end
 	end
-	for _, c in ipairs(hrp:GetChildren()) do handle(c) end
+	for _, c in ipairs(hrp:GetChildren()) do
+		handle(c)
+	end
 	hrp.ChildAdded:Connect(handle)
 end
 
 function WorldFx.muteVanillaSounds()
 	local function watch(other: Player)
 		if other.Character then task.spawn(muteStockSounds, other.Character) end
-		other.CharacterAdded:Connect(function(char) task.spawn(muteStockSounds, char) end)
+		other.CharacterAdded:Connect(function(char)
+			task.spawn(muteStockSounds, char)
+		end)
 	end
-	for _, other in ipairs(Players:GetPlayers()) do watch(other) end
+	for _, other in ipairs(Players:GetPlayers()) do
+		watch(other)
+	end
 	Players.PlayerAdded:Connect(watch)
 end
 
@@ -261,8 +429,14 @@ function WorldFx.bindFootsteps()
 		local accum = 0
 		local conn
 		conn = RunService.Heartbeat:Connect(function(dt)
-			if not humanoid.Parent then conn:Disconnect() return end
-			if humanoid.MoveDirection.Magnitude < 0.1 then accum = 0.35 return end
+			if not humanoid.Parent then
+				conn:Disconnect()
+				return
+			end
+			if humanoid.MoveDirection.Magnitude < 0.1 then
+				accum = 0.35
+				return
+			end
 			if humanoid.FloorMaterial == Enum.Material.Air then return end
 			accum += dt * (humanoid.WalkSpeed / 16)
 			if accum >= 0.42 then
@@ -408,8 +582,13 @@ function WorldFx.buildFlushHologram()
 	track.Size = UDim2.fromScale(0.9, 0.28)
 	track.BackgroundColor3 = Color3.new(1, 1, 1)
 	track.BorderSizePixel = 0
-	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(1, 0); tc.Parent = track
-	local ts = Instance.new("UIStroke"); ts.Thickness = 3; ts.Color = Color3.new(0, 0, 0); ts.Parent = track
+	local tc = Instance.new("UICorner")
+	tc.CornerRadius = UDim.new(1, 0)
+	tc.Parent = track
+	local ts = Instance.new("UIStroke")
+	ts.Thickness = 3
+	ts.Color = Color3.new(0, 0, 0)
+	ts.Parent = track
 	-- The gradient is the SCALE, not a fill: it spans every multiplier the table can
 	-- roll, worst on the left to best on the right, so the pointer's position alone
 	-- says whether this roll was good.
@@ -433,7 +612,9 @@ function WorldFx.buildFlushHologram()
 	shade.BackgroundTransparency = 0.55
 	shade.BorderSizePixel = 0
 	shade.ZIndex = 2
-	local sc = Instance.new("UICorner"); sc.CornerRadius = UDim.new(1, 0); sc.Parent = shade
+	local sc = Instance.new("UICorner")
+	sc.CornerRadius = UDim.new(1, 0)
+	sc.Parent = shade
 	shade.Parent = track
 
 	local timer = Instance.new("TextLabel")
@@ -446,9 +627,13 @@ function WorldFx.buildFlushHologram()
 	timer.Text = ""
 	timer.ZIndex = 4
 	local tp = Instance.new("UIPadding")
-	tp.PaddingTop = UDim.new(0.14, 0); tp.PaddingBottom = UDim.new(0.14, 0)
+	tp.PaddingTop = UDim.new(0.14, 0)
+	tp.PaddingBottom = UDim.new(0.14, 0)
 	tp.Parent = timer
-	local tms = Instance.new("UIStroke"); tms.Thickness = 3; tms.Color = Color3.new(0, 0, 0); tms.Parent = timer
+	local tms = Instance.new("UIStroke")
+	tms.Thickness = 3
+	tms.Color = Color3.new(0, 0, 0)
+	tms.Parent = timer
 	timer.Parent = track
 
 	-- the marker under the bar, pointing up at where this roll landed

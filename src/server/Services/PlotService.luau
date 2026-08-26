@@ -5,7 +5,7 @@
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+local CollectionService = game:GetService("CollectionService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.ToiletConfig)
@@ -68,9 +68,28 @@ function PlotService.padOf(plot: Model, kind: string): Model?
 	return PlotService.padsOf(plot, kind)[1]
 end
 
--- ── stalls ────────────────────────────────────────────────────────────────
--- fade-in tweens still running per stall, so a later hide can cancel them
-local stallTweens: { [Model]: { Tween } } = {}
+-- ── client-side reveal cues ──────────────────────────────────────────────
+-- Both reveal animations -- the stall fading in and the toilet popping in -- used
+-- to be driven from the server, a property write per part per frame. A toilet is
+-- ~24 parts and the bounce ran for 0.32s, so ONE toilet cost about 900 replicated
+-- writes, and "Buy 25" fired twenty-five of those at once. That is enough to back
+-- up the replication queue, and character movement shares that queue -- which is
+-- why other players' avatars froze on a busy server.
+--
+-- The server now places everything at its final size and transparency in a single
+-- write and merely CUES the animation; the client plays it locally. See
+-- WorldFx.initReveals.
+local REVEAL_TAG = "TfReveal"
+local REVEAL_AT = "TfRevealAt"
+
+-- Nil means "no animation, the state is already final" -- which is also how a hide
+-- cancels a reveal a client may still be playing.
+local function cueReveal(inst: Instance, at: number?)
+	inst:SetAttribute(REVEAL_AT, at)
+	if at and not CollectionService:HasTag(inst, REVEAL_TAG) then
+		CollectionService:AddTag(inst, REVEAL_TAG)
+	end
+end
 
 -- ── stacked stalls ───────────────────────────────────────────────────────
 -- Two things were wrong with a stack of stalls, both visible from the hub island.
@@ -276,34 +295,21 @@ local function setStallVisible(stall: Model, visible: boolean, animate: boolean)
 	if stall:GetAttribute("Unlocked") == visible then return end
 	stall:SetAttribute("Unlocked", visible)
 
-	-- A show tween left in flight keeps writing Transparency for 0.35s AFTER a hide
-	-- has set it to 1. On a bulk buy the merge runs in the same frame as the buy, so
-	-- stalls that had just been freed faded straight back in and stood there empty.
-	-- Cancel anything still animating before applying the new state.
-	local running = stallTweens[stall]
-	if running then
-		for _, tw in ipairs(running) do
-			tw:Cancel()
-		end
-		stallTweens[stall] = nil
-	end
-
-	local tweens: { Tween } = {}
+	-- The FINAL state, written once. A client playing the fade-in animates towards
+	-- this, so a stall hidden again mid-fade is already correct for anyone who never
+	-- ran the animation at all.
 	for _, p in ipairs(stall:GetDescendants()) do
 		-- pillars answer to the stall above, and ToiletSpot is a marker, not scenery
 		if p:IsA("BasePart") and p.Name ~= "ToiletSpot" and p.Name:sub(1, 6) ~= "Pillar" then
 			p.CanCollide = visible
-			if animate and visible then
-				p.Transparency = 1
-				local tw = TweenService:Create(p, TweenInfo.new(0.35), { Transparency = 0 })
-				tw:Play()
-				table.insert(tweens, tw)
-			else
-				p.Transparency = visible and 0 or 1
-			end
+			p.Transparency = visible and 0 or 1
 		end
 	end
-	stallTweens[stall] = (#tweens > 0) and tweens or nil
+
+	-- Clearing the cue on a hide is what stops a fade still in flight on someone's
+	-- screen: on a bulk buy the merge runs in the same frame as the buy, so stalls
+	-- that had just been freed used to fade straight back in and stand there empty.
+	cueReveal(stall, (animate and visible) and workspace:GetServerTimeNow() or nil)
 end
 
 -- Called whenever slot `slot` gains or loses a toilet: the stall UNDER it is the one
@@ -486,23 +492,10 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 	model.Parent = stall
 	placed[plot][slot] = model
 
-	-- pop-in bounce. ScaleTo is absolute against the model's ORIGINAL authored
-	-- size, so the animation has to target the fitted scale, not 1 — ending on
-	-- ScaleTo(1) restored every toilet to its raw asset size.
-	local fitted = model:GetScale()
-	model:ScaleTo(fitted * 0.01)
-	task.spawn(function()
-		local t0 = os.clock()
-		while true do
-			local a = (os.clock() - t0) / 0.32
-			if a >= 1 or not model.Parent then break end
-			-- overshoot then settle
-			local e = 1 + 2.2 * (1 - a) ^ 2 * math.sin(a * 9)
-			model:ScaleTo(math.max(0.01, fitted * a * e))
-			task.wait()
-		end
-		if model.Parent then model:ScaleTo(fitted) end
-	end)
+	-- Pop-in bounce, played on the client. The model is left at its fitted scale, so
+	-- a client that never runs the animation -- one that streamed the stall in
+	-- afterwards, or a client still loading -- sees a correctly sized toilet anyway.
+	cueReveal(model, workspace:GetServerTimeNow())
 	return model
 end
 

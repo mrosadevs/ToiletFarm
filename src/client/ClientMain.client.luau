@@ -9,18 +9,18 @@ local Format = require(Shared.Format)
 local Net = require(Shared.Net)
 
 local Controllers = script.Parent:WaitForChild("Controllers")
-local UIKit    = require(Controllers.UIKit)
-local Audio    = require(Controllers.Audio)
-local State    = require(Controllers.State)
-local Screens  = require(Controllers.Screens)
-local Popups   = require(Controllers.Popups)
-local WorldFx  = require(Controllers.WorldFx)
-local Hud      = require(Controllers.Hud)
-local Index    = require(Controllers.Index)
-local Panels   = require(Controllers.Panels)
-local Lucky    = require(Controllers.Lucky)
+local UIKit = require(Controllers.UIKit)
+local Audio = require(Controllers.Audio)
+local State = require(Controllers.State)
+local Screens = require(Controllers.Screens)
+local Popups = require(Controllers.Popups)
+local WorldFx = require(Controllers.WorldFx)
+local Hud = require(Controllers.Hud)
+local Index = require(Controllers.Index)
+local Panels = require(Controllers.Panels)
+local Lucky = require(Controllers.Lucky)
 local Tutorial = require(Controllers.Tutorial)
-local Freecam  = require(Controllers.Freecam)
+local Freecam = require(Controllers.Freecam)
 
 local player = Players.LocalPlayer
 
@@ -28,7 +28,9 @@ local player = Players.LocalPlayer
 Popups.init()
 State.init()
 Hud.init()
-Screens.register("IndexScreen", function() Index.refresh() end)
+Screens.register("IndexScreen", function()
+	Index.refresh()
+end)
 Index.init()
 Panels.init()
 Lucky.init()
@@ -37,6 +39,7 @@ Tutorial.init()
 Freecam.init()
 Screens.buildIconRow()
 WorldFx.bindPads()
+WorldFx.initReveals()
 WorldFx.muteVanillaSounds()
 WorldFx.bindFootsteps()
 WorldFx.bindPlotSounds()
@@ -64,9 +67,7 @@ Net.event(N.CashCollected).OnClientEvent:Connect(function(payload)
 	-- Only burst for a collection that happened somewhere in the world, i.e. the
 	-- player walked onto the Collect Cash pad. Auto Collect fires this every tick
 	-- with no position, and bursting on the character each time is maddening.
-	if payload.pos then
-		WorldFx.cashBurst(payload.pos, math.clamp(math.floor(payload.amount / 50), 8, 24))
-	end
+	if payload.pos then WorldFx.cashBurst(payload.pos, math.clamp(math.floor(payload.amount / 50), 8, 24)) end
 	Popups.toast("+" .. Format.cash(payload.amount) .. "$", "reward")
 end)
 
@@ -116,14 +117,10 @@ Net.event(N.PromptEventRsvp).OnClientEvent:Connect(function(eventId)
 			-- Somebody who already said yes on the game page does not need asking.
 			-- The server has spent its one prompt either way, which is the right
 			-- answer: they are going, so there is nothing left to ask them.
-			if SocialService:GetEventRsvpStatusAsync(eventId) ~= Enum.RsvpStatus.None then
-				return
-			end
+			if SocialService:GetEventRsvpStatusAsync(eventId) ~= Enum.RsvpStatus.None then return end
 			SocialService:PromptRsvpToEventAsync(eventId)
 		end)
-		if not ok then
-			warn("[ClientMain] event RSVP prompt failed: " .. tostring(err))
-		end
+		if not ok then warn("[ClientMain] event RSVP prompt failed: " .. tostring(err)) end
 	end)
 end)
 
