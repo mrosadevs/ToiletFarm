@@ -1,7 +1,7 @@
 --!strict
 -- Index — rebuilds the discovery grid from real save data.
 -- The Figma import ships twelve hard-coded example cards; those are mockup only,
--- so they get cleared and replaced with 30 toilets + 8 mutations driven by state.
+-- so they get cleared and replaced with one card per toilet tier, driven by state.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -70,7 +70,9 @@ local function makeCard(key: string, displayName: string, subtitle: string, rari
 	name.TextScaled = true
 	name.TextColor3 = Color3.new(1, 1, 1)
 	local ns = Instance.new("UIStroke")
-	ns.Thickness = 2.5; ns.Color = Color3.new(0, 0, 0); ns.Parent = name
+	ns.Thickness = 2.5
+	ns.Color = Color3.new(0, 0, 0)
+	ns.Parent = name
 	name.Parent = card
 
 	local cost = Instance.new("TextLabel")
@@ -83,7 +85,9 @@ local function makeCard(key: string, displayName: string, subtitle: string, rari
 	cost.TextScaled = true
 	cost.TextColor3 = Color3.fromRGB(255, 225, 120)
 	local cs = Instance.new("UIStroke")
-	cs.Thickness = 2.5; cs.Color = Color3.new(0, 0, 0); cs.Parent = cost
+	cs.Thickness = 2.5
+	cs.Color = Color3.new(0, 0, 0)
+	cs.Parent = cost
 	cost.Parent = card
 
 	card:SetAttribute("Key", key)
@@ -149,19 +153,16 @@ local function build()
 
 	for tier = 1, Config.MAX_TIER do
 		local key = Config.assetId(tier)
-		local card = makeCard(key, Config.displayName(tier),
-			"$" .. Format.short(Config.buyCost(tier)), Config.rarityOf(tier))
+		local card = makeCard(
+			key,
+			Config.displayName(tier),
+			"$" .. Format.short(Config.buyCost(tier)),
+			Config.rarityOf(tier)
+		)
 		card.LayoutOrder = tier
 		card.Parent = grid
 	end
-	for i, mut in ipairs(Config.MUTATION_ORDER) do
-		local key = "MUT_" .. mut
-		local card = makeCard(key, mut, ("x%s value"):format(Config.MUTATIONS[mut]), "Legendary")
-		card.LayoutOrder = 100 + i
-		card.Parent = grid
-	end
-
-	-- the mockup grid was a plain Frame; make it scroll now that it holds 38 cards.
+	-- the mockup grid was a plain Frame; make it scroll now that it holds 30 cards.
 	-- Measured rather than computed from a row count, so the inset is included and a
 	-- change to the card count cannot leave the last row unreachable.
 	grid.CanvasSize = UDim2.new()
@@ -173,23 +174,20 @@ function Index.refresh()
 	if not grid then return end
 	build()
 	local discovered = State.data.discovered or {}
-	local toilets, mutations = 0, 0
+	local toilets = 0
 	for _, card in ipairs(grid:GetChildren()) do
 		if card:IsA("Frame") and card:GetAttribute("Key") then
 			local key = card:GetAttribute("Key") :: string
 			local unlocked = discovered[key] == true
 			if unlocked then
-				if key:match("^MUT_") then mutations += 1 else toilets += 1 end
+				toilets += 1
 			end
-			if card:GetAttribute("Unlocked") ~= unlocked then
-				paintCard(card, unlocked)
-			end
+			if card:GetAttribute("Unlocked") ~= unlocked then paintCard(card, unlocked) end
 		end
 	end
 	if header then
 		-- the title bar is only ~1017px wide, so keep this short enough not to clip
-		header.Text = ("Index   %d/%d   •   %d/%d")
-			:format(toilets, Config.MAX_TIER, mutations, #Config.MUTATION_ORDER)
+		header.Text = ("Index   %d/%d"):format(toilets, Config.MAX_TIER)
 	end
 end
 
@@ -228,7 +226,10 @@ function Index.init()
 	local titleBar = panel:FindFirstChild("TitleBar")
 	if titleBar then
 		for _, d in ipairs(titleBar:GetDescendants()) do
-			if d:IsA("TextLabel") then header = d break end
+			if d:IsA("TextLabel") then
+				header = d
+				break
+			end
 		end
 	end
 

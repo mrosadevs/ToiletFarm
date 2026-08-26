@@ -24,36 +24,36 @@ end
 
 -- name -> gamepass id. This is the complete list; there are no other passes.
 PassService.PASSES = {
-	AutoFlush  = 1949349575,  -- "Auto Collect Poops"
-	AutoCash   = 1948857557,  -- "Auto Collect Cash"
-	DoublePoop = 1949439531,  -- "Double Poops" — x2 poop value
-	DoubleCash = 1948365646,  -- "x2 Cash" — doubles cash on deposit
+	AutoFlush = 1949349575, -- "Auto Collect Poops"
+	AutoCash = 1948857557, -- "Auto Collect Cash"
+	DoublePoop = 1949439531, -- "Double Poops" — x2 poop value
+	DoubleCash = 1948365646, -- "x2 Cash" — doubles cash on deposit
 
 	-- ⚠ Referenced by live code but not yet created on the site. A zero id reads as
 	--   "nobody owns it", which is why the AutoMerge pad answers "Coming soon!" and
 	--   why the extended offline cap never applies. Declared here so both are
 	--   visible in the one place ids are filled in, rather than being a name that
 	--   silently misses the table.
-	AutoMerge      = 0,       -- ToiletService auto-merge, AutoMergePad
-	ExtendedSeptic = 0,       -- raises the offline earnings cap (EconomyService)
+	AutoMerge = 0, -- ToiletService auto-merge, AutoMergePad
+	ExtendedSeptic = 0, -- raises the offline earnings cap (EconomyService)
 }
 
 -- name -> dev product id. This is the complete list; there are no other products.
 PassService.PRODUCTS = {
-	FinishProcessing = 3708565166,  -- "Instant Poop Process" — the Finish Now pad
-	PoopPack1        = 3708565222,  -- small cash pack
-	PoopPack2        = 3708565345,  -- medium cash pack
-	PoopPack3        = 3708565384,  -- large cash pack
+	FinishProcessing = 3708565166, -- "Instant Poop Process" — the Finish Now pad
+	PoopPack1 = 3708565222, -- small cash pack
+	PoopPack2 = 3708565345, -- medium cash pack
+	PoopPack3 = 3708565384, -- large cash pack
 	-- one product per Lucky Block tier
-	LuckyBasic       = 3708596231,
-	LuckyGreen       = 3708596305,
-	LuckyIce         = 3708596407,
-	LuckyPurple      = 3708596472,
-	LuckyWhite       = 3708596562,
+	LuckyBasic = 3708596231,
+	LuckyGreen = 3708596305,
+	LuckyIce = 3708596407,
+	LuckyPurple = 3708596472,
+	LuckyWhite = 3708596562,
 	-- Welcome Back modal only: doubles the offline poop claim
-	DoubleOffline    = 3708663796,
+	DoubleOffline = 3708663796,
 	-- the Rebirth panel's Skip button: rebirths you without the cash requirement
-	InstantRebirth   = 3709272645,
+	InstantRebirth = 3709272645,
 }
 
 local cache: { [number]: { [string]: boolean } } = {}
@@ -166,8 +166,13 @@ function PassService.publishPrices()
 		if not buyer then
 			if not warnedPrice[key] then
 				warnedPrice[key] = true
-				warn(("[Prices] %s is not in Prices.DASHBOARD — add it (API reports %d, so buyer price is about %d)")
-					:format(key, live, math.ceil(live / 0.9)))
+				warn(
+					("[Prices] %s is not in Prices.DASHBOARD — add it (API reports %d, so buyer price is about %d)"):format(
+						key,
+						live,
+						math.ceil(live / 0.9)
+					)
+				)
 			end
 			return
 		end
@@ -175,13 +180,23 @@ function PassService.publishPrices()
 			drifted += 1
 			if not warnedPrice[key] then
 				warnedPrice[key] = true
-				warn(("[Prices] %s changed on the site. API reports %d, which means a buyer price of about %d, but Prices.DASHBOARD still says %d — update it.")
-					:format(key, live, math.ceil(live / 0.9), buyer))
+				warn(
+					("[Prices] %s changed on the site. API reports %d, which means a buyer price of about %d, but Prices.DASHBOARD still says %d — update it."):format(
+						key,
+						live,
+						math.ceil(live / 0.9),
+						buyer
+					)
+				)
 			end
 		end
 	end
-	for name in pairs(PassService.PASSES) do check("pass", name, PassService.passPrice(name)) end
-	for name in pairs(PassService.PRODUCTS) do check("prod", name, PassService.productPrice(name)) end
+	for name in pairs(PassService.PASSES) do
+		check("pass", name, PassService.passPrice(name))
+	end
+	for name in pairs(PassService.PRODUCTS) do
+		check("prod", name, PassService.productPrice(name))
+	end
 	return checked, drifted
 end
 
@@ -193,7 +208,9 @@ function PassService.trimReceipts(profile)
 	local receipts = profile.receipts
 	if type(receipts) ~= "table" then return end
 	local keys = {}
-	for k in pairs(receipts) do table.insert(keys, k) end
+	for k in pairs(receipts) do
+		table.insert(keys, k)
+	end
 	if #keys <= RECEIPT_HISTORY then return end
 	table.sort(keys, function(a, b)
 		return (tonumber(receipts[a]) or 0) < (tonumber(receipts[b]) or 0)
@@ -266,9 +283,7 @@ function PassService.init()
 
 		local purchaseKey = tostring(receipt.PurchaseId)
 		profile.receipts = profile.receipts or {}
-		if profile.receipts[purchaseKey] then
-			return Enum.ProductPurchaseDecision.PurchaseGranted
-		end
+		if profile.receipts[purchaseKey] then return Enum.ProductPurchaseDecision.PurchaseGranted end
 
 		for name, id in pairs(PassService.PRODUCTS) do
 			if id == receipt.ProductId then
@@ -283,9 +298,7 @@ function PassService.init()
 					warn(("[PassService] handler for %s errored: %s"):format(name, tostring(granted)))
 					return Enum.ProductPurchaseDecision.NotProcessedYet
 				end
-				if not granted then
-					return Enum.ProductPurchaseDecision.NotProcessedYet
-				end
+				if not granted then return Enum.ProductPurchaseDecision.NotProcessedYet end
 
 				profile.receipts[purchaseKey] = os.time()
 				PassService.trimReceipts(profile)
@@ -294,8 +307,12 @@ function PassService.init()
 					-- The grant is real but not yet durable. Roll the ledger entry back and
 					-- let Roblox retry; the handler stays un-run so the retry re-grants.
 					profile.receipts[purchaseKey] = nil
-					warn(("[PassService] could not persist receipt %s for %s; asking for a retry")
-						:format(purchaseKey, player.Name))
+					warn(
+						("[PassService] could not persist receipt %s for %s; asking for a retry"):format(
+							purchaseKey,
+							player.Name
+						)
+					)
 					return Enum.ProductPurchaseDecision.NotProcessedYet
 				end
 

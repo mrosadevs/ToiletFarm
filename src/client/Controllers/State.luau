@@ -7,11 +7,24 @@ local Net = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Net")
 local State = {}
 
 State.data = {
-	cash = 0, poops = 0, poopItems = 0, rebirths = 0, tokens = 0, processing = 0,
-	toilets = {}, upgrades = {}, perks = {}, discovered = {}, luckyInv = {},
+	cash = 0,
+	poops = 0,
+	poopItems = 0,
+	rebirths = 0,
+	tokens = 0,
+	processing = 0,
+	toilets = {},
+	upgrades = {},
+	perks = {},
+	discovered = {},
+	luckyInv = {},
 	settings = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = false, AutoCash = false },
 	stats = { playtime = 0, totalDeposited = 0, bestCash = 0 },
-	tutorial = 1, carryCap = 25, slots = 8, maxTier = 6, multiplier = 1,
+	tutorial = 1,
+	carryCap = 25,
+	slots = 8,
+	maxTier = 6,
+	multiplier = 1,
 }
 
 local listeners: { (any, any) -> () } = {}

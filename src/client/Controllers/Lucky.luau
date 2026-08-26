@@ -51,9 +51,9 @@ local function totalToilets(): number
 end
 
 local RAINBOW = ColorSequence.new({
-	ColorSequenceKeypoint.new(0,   Color3.fromRGB(255, 148, 217)),
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 148, 217)),
 	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(168, 107, 255)),
-	ColorSequenceKeypoint.new(1,   Color3.fromRGB( 82, 224, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(82, 224, 255)),
 })
 
 -- One vivid gradient per ROW, the way the reference game does it: three rows that
@@ -62,9 +62,9 @@ local RAINBOW = ColorSequence.new({
 -- every row came out the same washed-out colour. The tier is still printed under
 -- each name, so nothing is lost by colouring the row rather than the rarity band.
 local ROW_GRADIENTS = {
-	ColorSequence.new(Color3.fromRGB(255, 215,  70), Color3.fromRGB(240, 125,   0)),
-	ColorSequence.new(Color3.fromRGB(110, 225, 255), Color3.fromRGB(  0, 125, 245)),
-	ColorSequence.new(Color3.fromRGB(130, 255, 120), Color3.fromRGB(  0, 180,  55)),
+	ColorSequence.new(Color3.fromRGB(255, 215, 70), Color3.fromRGB(240, 125, 0)),
+	ColorSequence.new(Color3.fromRGB(110, 225, 255), Color3.fromRGB(0, 125, 245)),
+	ColorSequence.new(Color3.fromRGB(130, 255, 120), Color3.fromRGB(0, 180, 55)),
 }
 
 -- Divine still overrides everything with the rainbow: at that point the rarity is
@@ -91,10 +91,7 @@ local function applyGradient(lbl: TextLabel, rarity: string)
 		grad.Color = RAINBOW
 	else
 		local c = Config.RARITY_COLORS[rarity] or Color3.fromRGB(200, 200, 200)
-		grad.Color = ColorSequence.new(
-			c:Lerp(Color3.new(1, 1, 1), 0.45),
-			c:Lerp(Color3.new(0, 0, 0), 0.20)
-		)
+		grad.Color = ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.45), c:Lerp(Color3.new(0, 0, 0), 0.20))
 	end
 	-- a UIGradient multiplies TextColor3, so the base has to be white
 	lbl.TextColor3 = Color3.new(1, 1, 1)
@@ -246,14 +243,22 @@ local function bind(blockId: string)
 			if not currentUid then return end
 			Audio.play("UiClick")
 			Net.event(Net.NAMES.OpenLucky):FireServer(currentUid, false)
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 	if refs.buyBtn then
 		UIKit.makeInteractive(refs.buyBtn, function()
 			if not currentUid then return end
 			Audio.play("UiClick")
 			Net.event(Net.NAMES.OpenLucky):FireServer(currentUid, true)
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 	if refs.discardBtn then
 		UIKit.makeInteractive(refs.discardBtn, function()
@@ -306,9 +311,7 @@ function Lucky.show(blockId: string, uid: string, quoted: number?)
 	end
 	-- read the live product price so the button can never advertise a number the
 	-- purchase prompt would not charge
-	if refs.buyPrice then
-		refs.buyPrice.Text = Prices.text("product", "Lucky" .. blockId)
-	end
+	if refs.buyPrice then refs.buyPrice.Text = Prices.text("product", "Lucky" .. blockId) end
 
 	refs.screen.Enabled = true
 	UIKit.bounceIn(refs.panel, 0.55)

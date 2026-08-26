@@ -79,13 +79,13 @@ end
 -- thin: the earlier set was mid-bright, so blended over a short word like "+30" it
 -- washed out to pastel and you never really saw the spectrum.
 UIKit.RAINBOW = ColorSequence.new({
-	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,  40,  60)),
-	ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 140,   0)),
-	ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230,   0)),
-	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(  0, 220,  70)),
-	ColorSequenceKeypoint.new(0.67, Color3.fromRGB(  0, 190, 255)),
-	ColorSequenceKeypoint.new(0.83, Color3.fromRGB(130,  60, 255)),
-	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255,   0, 190)),
+	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 40, 60)),
+	ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 140, 0)),
+	ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 0)),
+	ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 220, 70)),
+	ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 190, 255)),
+	ColorSequenceKeypoint.new(0.83, Color3.fromRGB(130, 60, 255)),
+	ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 190)),
 })
 
 function UIKit.gradient(label: TextLabel, seq: ColorSequence, rotation: number?)
@@ -102,10 +102,11 @@ end
 
 -- a two-stop gradient around one colour, light at the top and deep at the bottom
 function UIKit.tintGradient(label: TextLabel, c: Color3, rotation: number?)
-	return UIKit.gradient(label, ColorSequence.new(
-		c:Lerp(Color3.new(1, 1, 1), 0.45),
-		c:Lerp(Color3.new(0, 0, 0), 0.20)
-	), rotation)
+	return UIKit.gradient(
+		label,
+		ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.45), c:Lerp(Color3.new(0, 0, 0), 0.20)),
+		rotation
+	)
 end
 
 local MARGIN_CLOSE = 4
@@ -151,8 +152,11 @@ function UIKit.tuckCloseButton(container: GuiObject)
 		-- measured before any of this ran
 		if container:IsA("GuiObject") and container.Size.X.Offset > 0 then
 			container.Size = UDim2.new(
-				container.Size.X.Scale, container.Size.X.Offset + growRight,
-				container.Size.Y.Scale, container.Size.Y.Offset)
+				container.Size.X.Scale,
+				container.Size.X.Offset + growRight,
+				container.Size.Y.Scale,
+				container.Size.Y.Offset
+			)
 			local design = container:GetAttribute("DesignSize") :: Vector2?
 			if design then
 				container:SetAttribute("DesignSize", Vector2.new(design.X + growRight, design.Y))
@@ -165,16 +169,26 @@ function UIKit.tuckCloseButton(container: GuiObject)
 		for _, item in ipairs({ close, bar }) do
 			if item and item:IsA("GuiObject") then
 				item.Position = UDim2.new(
-					item.Position.X.Scale, item.Position.X.Offset,
-					item.Position.Y.Scale, item.Position.Y.Offset + dropDown)
+					item.Position.X.Scale,
+					item.Position.X.Offset,
+					item.Position.Y.Scale,
+					item.Position.Y.Offset + dropDown
+				)
 			end
 		end
-		panel.Size = UDim2.new(panel.Size.X.Scale, panel.Size.X.Offset,
-			panel.Size.Y.Scale, panel.Size.Y.Offset + dropDown)
+		panel.Size = UDim2.new(
+			panel.Size.X.Scale,
+			panel.Size.X.Offset,
+			panel.Size.Y.Scale,
+			panel.Size.Y.Offset + dropDown
+		)
 		if container:IsA("GuiObject") and container.Size.Y.Offset > 0 then
 			container.Size = UDim2.new(
-				container.Size.X.Scale, container.Size.X.Offset,
-				container.Size.Y.Scale, container.Size.Y.Offset + dropDown)
+				container.Size.X.Scale,
+				container.Size.X.Offset,
+				container.Size.Y.Scale,
+				container.Size.Y.Offset + dropDown
+			)
 			local design = container:GetAttribute("DesignSize") :: Vector2?
 			if design then
 				container:SetAttribute("DesignSize", Vector2.new(design.X, design.Y + dropDown))
@@ -217,7 +231,9 @@ function UIKit.bindScale(screen: ScreenGui, fill: boolean?)
 		-- fit, never crop; phones end up small but nothing runs off-screen
 		local s = math.min(vp.X / DESIGN.X, vp.Y / DESIGN.Y)
 		-- on very narrow screens bump it up a little or the HUD is unreadable
-		if vp.X < 700 then s *= 1.25 end
+		if vp.X < 700 then
+			s *= 1.25
+		end
 		-- ...but never past the point where the panel swallows the screen. Bound the
 		-- scale by THIS panel's own design size so the result always leaves a margin,
 		-- whatever the panel measures.
@@ -372,10 +388,12 @@ function UIKit.flash(target: GuiObject)
 	grad.Parent = shine
 	shine.Parent = face
 
-	local t = TweenService:Create(grad, TweenInfo.new(0.35, Enum.EasingStyle.Quad),
-		{ Offset = Vector2.new(1, 0) })
+	local t =
+		TweenService:Create(grad, TweenInfo.new(0.35, Enum.EasingStyle.Quad), { Offset = Vector2.new(1, 0) })
 	t:Play()
-	t.Completed:Connect(function() shine:Destroy() end)
+	t.Completed:Connect(function()
+		shine:Destroy()
+	end)
 end
 
 -- panels bounce in from small, and pop out on close
@@ -383,14 +401,18 @@ function UIKit.bounceIn(o: GuiObject, from: number?)
 	local s = scaleOf(o)
 	s.Scale = from or 0.55
 	o.Visible = true
-	TweenService:Create(s, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ Scale = 1 }):Play()
+	TweenService
+		:Create(s, TweenInfo.new(0.42, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+		:Play()
 end
 
 function UIKit.bounceOut(o: GuiObject, onDone: (() -> ())?)
 	local s = scaleOf(o)
-	local t = TweenService:Create(s, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-		{ Scale = 0.5 })
+	local t = TweenService:Create(
+		s,
+		TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+		{ Scale = 0.5 }
+	)
 	t:Play()
 	t.Completed:Connect(function()
 		o.Visible = false
@@ -403,8 +425,8 @@ end
 function UIKit.pop(o: GuiObject, amount: number?)
 	local s = scaleOf(o)
 	s.Scale = amount or 1.18
-	TweenService:Create(s, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ Scale = 1 }):Play()
+	TweenService:Create(s, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 })
+		:Play()
 end
 
 -- ── misc ──────────────────────────────────────────────────────────────────
@@ -413,7 +435,13 @@ function UIKit.findFirst(root: Instance, name: string): any
 end
 
 -- number that rolls up to its new value instead of snapping
-function UIKit.rollNumber(label: TextLabel, from: number, to: number, format: (number) -> string, dur: number?)
+function UIKit.rollNumber(
+	label: TextLabel,
+	from: number,
+	to: number,
+	format: (number) -> string,
+	dur: number?
+)
 	dur = dur or 0.35
 	local t0 = os.clock()
 	task.spawn(function()

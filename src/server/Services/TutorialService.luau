@@ -17,15 +17,31 @@ local TutorialService = {}
 
 -- `target` names the pad the arrow trail should point at
 TutorialService.STEPS = {
-	{ id = "buy",     title = "Buy your first toilet!", goal = 1, target = "BuyButton", targetName = "BuyButton_1" },
+	{
+		id = "buy",
+		title = "Buy your first toilet!",
+		goal = 1,
+		target = "BuyButton",
+		targetName = "BuyButton_1",
+	},
 	-- derived from the count scale, so turning that up cannot leave the tutorial
 	-- asking for a target the first dropping already clears
-	{ id = "collect", title = ("Collect %d Poops"):format(5 * Config.POOP_COUNT_SCALE),
-	                                                    goal = 5 * Config.POOP_COUNT_SCALE, target = nil },
-	{ id = "deposit", title = "Deposit your Poops",     goal = 1, target = "DepositPad"    },
-	{ id = "cash",    title = "Collect your Cash!",     goal = 1, target = "CollectCashPad" },
-	{ id = "three",   title = "Get 3 Toilets",          goal = 3, target = "BuyButton", targetName = "BuyButton_1" },
-	{ id = "merge",   title = "Merge your Toilets!",    goal = 1, target = "MergePad"      },
+	{
+		id = "collect",
+		title = ("Collect %d Poops"):format(5 * Config.POOP_COUNT_SCALE),
+		goal = 5 * Config.POOP_COUNT_SCALE,
+		target = nil,
+	},
+	{ id = "deposit", title = "Deposit your Poops", goal = 1, target = "DepositPad" },
+	{ id = "cash", title = "Collect your Cash!", goal = 1, target = "CollectCashPad" },
+	{
+		id = "three",
+		title = "Get 3 Toilets",
+		goal = 3,
+		target = "BuyButton",
+		targetName = "BuyButton_1",
+	},
+	{ id = "merge", title = "Merge your Toilets!", goal = 1, target = "MergePad" },
 }
 
 -- progress within the current step, runtime only
@@ -51,12 +67,12 @@ function TutorialService.push(player: Player)
 		local pad
 		-- padOf returns whichever pad of that kind comes first, which for BuyButton
 		-- could be the $250 or $1,000 one. Prefer an exact model name when given.
-		if plot and step.targetName then
-			pad = plot:FindFirstChild(step.targetName, true)
-		end
+		if plot and step.targetName then pad = plot:FindFirstChild(step.targetName, true) end
 		if not pad and plot then pad = PlotService.padOf(plot, step.target) end
 		if pad then
-			local anchor = pad.PrimaryPart or pad:FindFirstChild("Plate") or pad:FindFirstChildWhichIsA("BasePart", true)
+			local anchor = pad.PrimaryPart
+				or pad:FindFirstChild("Plate")
+				or pad:FindFirstChildWhichIsA("BasePart", true)
 			if anchor then targetPos = anchor.Position end
 		end
 	end

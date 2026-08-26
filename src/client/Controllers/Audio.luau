@@ -50,9 +50,13 @@ function Audio.play(name: string, opts: any?)
 		s.RollOffMaxDistance = opts.range
 	end
 	s:Play()
-	s.Ended:Connect(function() s:Destroy() end)
+	s.Ended:Connect(function()
+		s:Destroy()
+	end)
 	-- safety net: some ids never fire Ended if they fail to load
-	task.delay(12, function() if s.Parent then s:Destroy() end end)
+	task.delay(12, function()
+		if s.Parent then s:Destroy() end
+	end)
 	return s
 end
 

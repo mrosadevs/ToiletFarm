@@ -13,21 +13,21 @@ local Net = require(Shared.Net)
 local RemoteGuard = require(script.Parent.Security.RemoteGuard)
 
 local Services = script.Parent.Services
-local DataService       = require(Services.DataService)
-local PassService       = require(Services.PassService)
-local PlotService       = require(Services.PlotService)
-local PoopService       = require(Services.PoopService)
-local IndexService      = require(Services.IndexService)
+local DataService = require(Services.DataService)
+local PassService = require(Services.PassService)
+local PlotService = require(Services.PlotService)
+local PoopService = require(Services.PoopService)
+local IndexService = require(Services.IndexService)
 local FlushMeterService = require(Services.FlushMeterService)
-local ToiletService     = require(Services.ToiletService)
-local EconomyService    = require(Services.EconomyService)
+local ToiletService = require(Services.ToiletService)
+local EconomyService = require(Services.EconomyService)
 local LuckyBlockService = require(Services.LuckyBlockService)
-local TutorialService   = require(Services.TutorialService)
-local CodesService      = require(Services.CodesService)
-local PadService        = require(Services.PadService)
-local VfxService        = require(Services.VfxService)
+local TutorialService = require(Services.TutorialService)
+local CodesService = require(Services.CodesService)
+local PadService = require(Services.PadService)
+local VfxService = require(Services.VfxService)
 local LeaderboardService = require(Services.LeaderboardService)
-local AnalyticsService  = require(Services.AnalyticsService)
+local AnalyticsService = require(Services.AnalyticsService)
 local EventPromptService = require(Services.EventPromptService)
 
 PassService.bindData(DataService)
@@ -59,7 +59,9 @@ local function setCollisionGroup(character: Model)
 	local function apply(part: Instance)
 		if part:IsA("BasePart") then part.CollisionGroup = "Characters" end
 	end
-	for _, d in ipairs(character:GetDescendants()) do apply(d) end
+	for _, d in ipairs(character:GetDescendants()) do
+		apply(d)
+	end
 	character.DescendantAdded:Connect(apply)
 end
 
@@ -90,7 +92,9 @@ end
 Players.PlayerAdded:Connect(function(player)
 	-- DataService.PlayerAdded runs first (connected earlier), so wait for the profile
 	local deadline = os.clock() + 15
-	while not DataService.isLoaded(player) and os.clock() < deadline do task.wait(0.1) end
+	while not DataService.isLoaded(player) and os.clock() < deadline do
+		task.wait(0.1)
+	end
 	if not DataService.isLoaded(player) then return end
 
 	local plot = PlotService.claim(player)
@@ -106,7 +110,9 @@ Players.PlayerAdded:Connect(function(player)
 	EconomyService.reportOffline(player)
 
 	if player.Character then task.spawn(onCharacter, player) end
-	player.CharacterAdded:Connect(function() task.spawn(onCharacter, player) end)
+	player.CharacterAdded:Connect(function()
+		task.spawn(onCharacter, player)
+	end)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
@@ -135,7 +141,8 @@ RemoteGuard.handle(N.Rebirth, { burst = 3, perSecond = 1 }, function(player)
 end)
 
 RemoteGuard.handle(N.BuyUpgrade, {
-	burst = 12, perSecond = 6,
+	burst = 12,
+	perSecond = 6,
 	args = { RemoteGuard.string({ maxLength = 32 }) },
 }, function(player, key)
 	if not loaded(player) then return end
@@ -143,7 +150,8 @@ RemoteGuard.handle(N.BuyUpgrade, {
 end)
 
 RemoteGuard.handle(N.BuyTokenPerk, {
-	burst = 12, perSecond = 6,
+	burst = 12,
+	perSecond = 6,
 	args = { RemoteGuard.string({ maxLength = 32 }) },
 }, function(player, id)
 	if not loaded(player) then return end
@@ -151,7 +159,8 @@ RemoteGuard.handle(N.BuyTokenPerk, {
 end)
 
 RemoteGuard.handle(N.OpenLucky, {
-	burst = 5, perSecond = 2,
+	burst = 5,
+	perSecond = 2,
 	args = { RemoteGuard.string({ maxLength = 64 }), RemoteGuard.optional(RemoteGuard.boolean()) },
 }, function(player, blockUid, useRobux)
 	if not loaded(player) then return end
@@ -159,7 +168,9 @@ RemoteGuard.handle(N.OpenLucky, {
 		-- charge through a dev product; the handler below finishes the open
 		local p = DataService.get(player)
 		local entry
-		for _, e in ipairs(p.luckyInv) do if e.uid == blockUid then entry = e end end
+		for _, e in ipairs(p.luckyInv) do
+			if e.uid == blockUid then entry = e end
+		end
 		if not entry then return end
 		local id = PassService.productId("Lucky" .. entry.id)
 		if id == 0 then
@@ -174,7 +185,8 @@ RemoteGuard.handle(N.OpenLucky, {
 end)
 
 RemoteGuard.handle(N.DiscardLucky, {
-	burst = 5, perSecond = 2,
+	burst = 5,
+	perSecond = 2,
 	args = { RemoteGuard.string({ maxLength = 64 }) },
 }, function(player, blockUid)
 	if not loaded(player) then return end
@@ -184,7 +196,8 @@ end)
 -- Slow on purpose. The code list is short and guessable, so the limit is what
 -- stops it being enumerated rather than the secrecy of the codes themselves.
 RemoteGuard.handle(N.RedeemCode, {
-	burst = 3, perSecond = 0.2,
+	burst = 3,
+	perSecond = 0.2,
 	args = { RemoteGuard.string({ maxLength = 40 }) },
 }, function(player, code)
 	if not loaded(player) then return end
@@ -193,7 +206,8 @@ end)
 
 RemoteGuard.handle(N.SetSetting, {
 	-- volume sliders fire continuously while dragged
-	burst = 30, perSecond = 15,
+	burst = 30,
+	perSecond = 15,
 	args = { RemoteGuard.string({ maxLength = 32 }), RemoteGuard.scalar() },
 }, function(player, key, value)
 	local p = DataService.get(player)
@@ -218,7 +232,8 @@ RemoteGuard.handle(N.TeleportHome, { burst = 2, perSecond = 1 }, function(player
 end)
 
 RemoteGuard.handle(N.ClaimOffline, {
-	burst = 3, perSecond = 1,
+	burst = 3,
+	perSecond = 1,
 	args = { RemoteGuard.optional(RemoteGuard.boolean()) },
 }, function(player)
 	if not loaded(player) then return end
@@ -248,7 +263,10 @@ end)
 
 PassService.onProduct("LuckyBlockx10", function(player)
 	for _ = 1, 10 do
-		LuckyBlockService.grant(player, Config.rollLuckyBlockId((DataService.get(player) or {}).rebirths or 0))
+		LuckyBlockService.grant(
+			player,
+			Config.rollLuckyBlockId((DataService.get(player) or {}).rebirths or 0)
+		)
 	end
 	return true
 end)
@@ -300,13 +318,15 @@ if game:GetService("RunService"):IsStudio() then
 					local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 					local pos = hrp and hrp.Position
 					if which == "deposit" then
-						Net.event(N.Deposited):FireClient(player,
-							{ poops = 12345, count = 87, cash = 18500, multiplier = 1.5 })
+						Net.event(N.Deposited)
+							:FireClient(player, { poops = 12345, count = 87, cash = 18500, multiplier = 1.5 })
 					elseif which == "cash" then
 						Net.event(N.CashCollected):FireClient(player, { amount = 4200, pos = pos })
 					elseif which == "poop" then
 						local payload = {}
-						for i = 1, 8 do table.insert(payload, { pos = pos, value = 250 * i }) end
+						for i = 1, 8 do
+							table.insert(payload, { pos = pos, value = 250 * i })
+						end
 						Net.event(N.PoopPickup):FireClient(player, payload, 9999, 12, 25)
 					end
 					task.wait(2)
@@ -322,7 +342,9 @@ if game:GetService("RunService"):IsStudio() then
 			DataService.push(player, { cash = p.cash })
 		end)
 	end
-	for _, player in ipairs(Players:GetPlayers()) do hook(player) end
+	for _, player in ipairs(Players:GetPlayers()) do
+		hook(player)
+	end
 	Players.PlayerAdded:Connect(hook)
 	print("[ToiletFarm] Studio dev hooks active (DevSpawnLucky / DevGiveCash)")
 end

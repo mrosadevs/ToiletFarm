@@ -19,17 +19,16 @@ local function tierFromKey(key: string): number?
 	return n and tonumber(n) or nil
 end
 
-function IndexService.counts(player: Player): (number, number)
+function IndexService.counts(player: Player): number
 	local p = DataService.get(player)
-	if not p then return 0, 0 end
-	local toilets, mutations = 0, 0
+	if not p then return 0 end
+	local toilets = 0
 	for t = 1, Config.MAX_TIER do
-		if p.discovered[Config.assetId(t)] then toilets += 1 end
+		if p.discovered[Config.assetId(t)] then
+			toilets += 1
+		end
 	end
-	for _, m in ipairs(Config.MUTATION_ORDER) do
-		if p.discovered["MUT_" .. m] then mutations += 1 end
-	end
-	return toilets, mutations
+	return toilets
 end
 
 -- Returns true if this was genuinely new, so callers can chain a celebration.
@@ -37,41 +36,35 @@ function IndexService.discover(player: Player, key: string): boolean
 	local p = DataService.get(player)
 	if not p or p.discovered[key] then return false end
 
-	local beforeToilets = select(1, IndexService.counts(player))
+	-- Only toilet tiers are tracked. Anything else is not a discovery.
+	local tier = tierFromKey(key)
+	if not tier then return false end
+
+	local beforeToilets = IndexService.counts(player)
 	p.discovered[key] = true
 
-	local tier = tierFromKey(key)
-	local displayName, rarity
-	if tier then
-		displayName = Config.displayName(tier)
-		rarity = Config.rarityOf(tier)
-	else
-		displayName = key:gsub("^MUT_", "")
-		rarity = "Legendary"
-	end
+	local displayName = Config.displayName(tier)
+	local rarity = Config.rarityOf(tier)
 
 	DiscoveredEvent:FireClient(player, {
 		key = key,
 		name = displayName,
 		rarity = rarity,
 		weight = Config.DISCOVERY_WEIGHT[rarity] or 1,
-		isMutation = tier == nil,
 	})
 
 	-- completion rewards
-	local toilets, mutations = IndexService.counts(player)
-	if tier and math.floor(toilets / Config.INDEX_TOILET_REWARD_EVERY)
-	         > math.floor(beforeToilets / Config.INDEX_TOILET_REWARD_EVERY) then
+	local toilets = IndexService.counts(player)
+	if
+		math.floor(toilets / Config.INDEX_TOILET_REWARD_EVERY)
+		> math.floor(beforeToilets / Config.INDEX_TOILET_REWARD_EVERY)
+	then
 		p.tokens += 1
 		ToastEvent:FireClient(player, "Index milestone! +1 Flush Token", "reward")
 	end
 	if toilets >= Config.MAX_TIER and not p.discovered["__ALL_TOILETS"] then
 		p.discovered["__ALL_TOILETS"] = true
 		ToastEvent:FireClient(player, "INDEX COMPLETE! Permanent +25% income", "reward")
-	end
-	if mutations >= #Config.MUTATION_ORDER and not p.discovered["__ALL_MUTATIONS"] then
-		p.discovered["__ALL_MUTATIONS"] = true
-		ToastEvent:FireClient(player, "All mutations found! +10% Lucky Block luck", "reward")
 	end
 
 	DataService.push(player, { discovered = p.discovered, tokens = p.tokens })

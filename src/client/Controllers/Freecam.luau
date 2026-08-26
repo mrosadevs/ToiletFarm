@@ -30,9 +30,9 @@ local Freecam = {}
 local ALLOW: { number } = {}
 
 -- ── feel ──────────────────────────────────────────────────────────────────
-local SPEED_DEFAULT = 55            -- studs/second
+local SPEED_DEFAULT = 55 -- studs/second
 local SPEED_MIN, SPEED_MAX = 2, 900
-local SPEED_STEP = 1.18             -- one wheel notch, multiplicative
+local SPEED_STEP = 1.18 -- one wheel notch, multiplicative
 local BOOST, PRECISE = 3.5, 0.2
 
 -- Time constants for the smoothing, in seconds: roughly how long a change takes to
@@ -44,12 +44,12 @@ local LOOK_TAU = 0.055
 local FOV_TAU = 0.12
 local ROLL_TAU = 0.18
 
-local LOOK_SENS = 0.0032            -- radians per pixel of mouse travel
-local PAD_LOOK = 2.8                -- radians/second at full stick
+local LOOK_SENS = 0.0032 -- radians per pixel of mouse travel
+local PAD_LOOK = 2.8 -- radians/second at full stick
 local PAD_DEADZONE = 0.14
-local PITCH_LIMIT = math.rad(89)    -- stop short, so it can never gimbal over the top
-local ROLL_RATE = math.rad(50)      -- per second, while Z or X is held
-local FOV_RATE = 30                 -- degrees/second, while [ or ] is held
+local PITCH_LIMIT = math.rad(89) -- stop short, so it can never gimbal over the top
+local ROLL_RATE = math.rad(50) -- per second, while Z or X is held
+local FOV_RATE = 30 -- degrees/second, while [ or ] is held
 local FOV_MIN, FOV_MAX = 5, 120
 
 -- ── state ─────────────────────────────────────────────────────────────────
@@ -208,12 +208,12 @@ local function setUiHidden(hide: boolean)
 			end
 		end
 		for _, t in ipairs(Enum.CoreGuiType:GetEnumItems()) do
-			if t ~= Enum.CoreGuiType.All then
-				coreState[t] = StarterGui:GetCoreGuiEnabled(t)
-			end
+			if t ~= Enum.CoreGuiType.All then coreState[t] = StarterGui:GetCoreGuiEnabled(t) end
 		end
 		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-		pcall(function() StarterGui:SetCore("TopbarEnabled", false) end)
+		pcall(function()
+			StarterGui:SetCore("TopbarEnabled", false)
+		end)
 	else
 		-- only the ones WE turned off, so a panel the player had closed stays closed
 		for _, g in ipairs(hiddenGuis) do
@@ -221,10 +221,14 @@ local function setUiHidden(hide: boolean)
 		end
 		table.clear(hiddenGuis)
 		for t, was in pairs(coreState) do
-			pcall(function() StarterGui:SetCoreGuiEnabled(t, was) end)
+			pcall(function()
+				StarterGui:SetCoreGuiEnabled(t, was)
+			end)
 		end
 		table.clear(coreState)
-		pcall(function() StarterGui:SetCore("TopbarEnabled", true) end)
+		pcall(function()
+			StarterGui:SetCore("TopbarEnabled", true)
+		end)
 	end
 end
 
@@ -239,9 +243,7 @@ local function applyCharHidden()
 	local char = player.Character
 	if not char then return end
 	for _, d in ipairs(char:GetDescendants()) do
-		if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
-			d.LocalTransparencyModifier = 1
-		end
+		if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then d.LocalTransparencyModifier = 1 end
 	end
 end
 
@@ -249,9 +251,7 @@ local function restoreChar()
 	local char = player.Character
 	if not char then return end
 	for _, d in ipairs(char:GetDescendants()) do
-		if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then
-			d.LocalTransparencyModifier = 0
-		end
+		if d:IsA("BasePart") or d:IsA("Decal") or d:IsA("Texture") then d.LocalTransparencyModifier = 0 end
 	end
 end
 
@@ -260,7 +260,9 @@ end
 -- we do not own; zeroing the humanoid means that even if it is missing, the avatar
 -- cannot be walked off camera by the very keys we are flying with.
 local function freeze(char: Model?)
-	if controls then pcall(function() controls:Disable() end) end
+	if controls then pcall(function()
+		controls:Disable()
+	end) end
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local s = saved
 	if hum and s then
@@ -277,7 +279,9 @@ local function freeze(char: Model?)
 end
 
 local function thaw()
-	if controls then pcall(function() controls:Enable() end) end
+	if controls then pcall(function()
+		controls:Enable()
+	end) end
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local s = saved
@@ -361,18 +365,21 @@ local function step(dt: number)
 		0,
 		down(Enum.KeyCode.S) - down(Enum.KeyCode.W) - padMove.Y
 	)
-	local lift = down(Enum.KeyCode.E) - down(Enum.KeyCode.Q)
-		+ down(Enum.KeyCode.Space) + padLift
+	local lift = down(Enum.KeyCode.E) - down(Enum.KeyCode.Q) + down(Enum.KeyCode.Space) + padLift
 	local dir = rot:VectorToWorldSpace(flat) + Vector3.yAxis * lift
 	if dir.Magnitude > 1 then dir = dir.Unit end
 
 	local mult = 1
-	if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
-		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
+	if
+		UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+	then
 		mult *= BOOST
 	end
-	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
-		or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+	if
+		UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+		or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+	then
 		mult *= PRECISE
 	end
 
@@ -450,9 +457,7 @@ function Freecam.exit()
 		camera.CameraType = s.cameraType
 		-- Scriptable is the one state the default camera will not take back on its
 		-- own, so if that is somehow where we came from, hand back a working camera
-		if camera.CameraType == Enum.CameraType.Scriptable then
-			camera.CameraType = Enum.CameraType.Custom
-		end
+		if camera.CameraType == Enum.CameraType.Scriptable then camera.CameraType = Enum.CameraType.Custom end
 	end
 	if s then
 		UserInputService.MouseBehavior = s.mouseBehavior
@@ -462,7 +467,11 @@ function Freecam.exit()
 end
 
 function Freecam.toggle()
-	if active then Freecam.exit() else Freecam.enter() end
+	if active then
+		Freecam.exit()
+	else
+		Freecam.enter()
+	end
 end
 
 function Freecam.isActive(): boolean
@@ -525,7 +534,11 @@ function Freecam.init()
 			refreshOverlay()
 		elseif input.KeyCode == Enum.KeyCode.T then
 			charHidden = not charHidden
-			if charHidden then applyCharHidden() else restoreChar() end
+			if charHidden then
+				applyCharHidden()
+			else
+				restoreChar()
+			end
 		elseif input.KeyCode == Enum.KeyCode.BackSlash then
 			wantFov = 70
 			wantRoll = 0

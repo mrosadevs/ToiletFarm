@@ -34,10 +34,14 @@ function Screens.register(name: string, onOpen: (() -> ())?)
 	-- every panel's X closes it
 	local close = screen:FindFirstChild("CloseButton", true)
 	if close and close:IsA("GuiObject") then
-		UIKit.makeInteractive(close, function() Screens.close(name) end, {
+		UIKit.makeInteractive(close, function()
+			Screens.close(name)
+		end, {
 			hover = 1.0,
 			press = 0.95,
-			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
 		})
 	end
 	return screen
@@ -58,7 +62,10 @@ function Screens.open(name: string)
 		-- bounce the panel, not the container's UIScale, or we fight the viewport scale
 		local panel = nil
 		for _, c in ipairs(container:GetChildren()) do
-			if c:IsA("GuiObject") and c.Name:match("Panel") then panel = c break end
+			if c:IsA("GuiObject") and c.Name:match("Panel") then
+				panel = c
+				break
+			end
 		end
 		UIKit.bounceIn(panel or container, 0.6)
 	end
@@ -75,7 +82,10 @@ function Screens.close(name: string, silent: boolean?)
 	local panel = nil
 	if container then
 		for _, c in ipairs(container:GetChildren()) do
-			if c:IsA("GuiObject") and c.Name:match("Panel") then panel = c break end
+			if c:IsA("GuiObject") and c.Name:match("Panel") then
+				panel = c
+				break
+			end
 		end
 	end
 	if not silent then Audio.play("UiClose") end
@@ -90,7 +100,11 @@ function Screens.close(name: string, silent: boolean?)
 end
 
 function Screens.toggle(name: string)
-	if Screens.isOpen(name) then Screens.close(name) else Screens.open(name) end
+	if Screens.isOpen(name) then
+		Screens.close(name)
+	else
+		Screens.open(name)
+	end
 end
 
 -- ── top-left icon row ─────────────────────────────────────────────────────
@@ -103,10 +117,30 @@ end
 -- `invite` raises Roblox's own invite-a-friend dialog instead of one of our panels,
 -- so every entry carries both fields and the shape stays uniform.
 local ICONS = {
-	{ name = "Codes",    screen = "RedeemCodesScreen", image = "rbxassetid://94059211188461",  invite = false },
-	{ name = "Settings", screen = "SettingsScreen",    image = "rbxassetid://77358150753910",  invite = false },
-	{ name = "Profile",  screen = "ProfileScreen",     image = "rbxassetid://118735441671958", invite = false },
-	{ name = "Invite",   screen = "",                  image = "rbxassetid://132819889079323", invite = true  },
+	{
+		name = "Codes",
+		screen = "RedeemCodesScreen",
+		image = "rbxassetid://94059211188461",
+		invite = false,
+	},
+	{
+		name = "Settings",
+		screen = "SettingsScreen",
+		image = "rbxassetid://77358150753910",
+		invite = false,
+	},
+	{
+		name = "Profile",
+		screen = "ProfileScreen",
+		image = "rbxassetid://118735441671958",
+		invite = false,
+	},
+	{
+		name = "Invite",
+		screen = "",
+		image = "rbxassetid://132819889079323",
+		invite = true,
+	},
 }
 
 -- CanSendGameInviteAsync is a web call, and asking it on the click is what made the
@@ -124,9 +158,7 @@ local function warmInvite()
 		local ok, can = pcall(function()
 			return SocialService:CanSendGameInviteAsync(player)
 		end)
-		if not ok then
-			warn("[Screens] invite check failed: " .. tostring(can))
-		end
+		if not ok then warn("[Screens] invite check failed: " .. tostring(can)) end
 		-- written out rather than `ok and can or false`, which reads as the same
 		-- thing and is not
 		if ok and can == true then
@@ -206,8 +238,10 @@ function Screens.buildIconRow()
 		img.ScaleType = Enum.ScaleType.Fit
 		img.Image = def.image
 		local pad = Instance.new("UIPadding")
-		pad.PaddingTop = UDim.new(0.17, 0); pad.PaddingBottom = UDim.new(0.17, 0)
-		pad.PaddingLeft = UDim.new(0.17, 0); pad.PaddingRight = UDim.new(0.17, 0)
+		pad.PaddingTop = UDim.new(0.17, 0)
+		pad.PaddingBottom = UDim.new(0.17, 0)
+		pad.PaddingLeft = UDim.new(0.17, 0)
+		pad.PaddingRight = UDim.new(0.17, 0)
 		pad.Parent = img
 		img.Parent = btn
 
@@ -223,7 +257,9 @@ function Screens.buildIconRow()
 			end
 		end, {
 			hover = 1.15,
-			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
 		})
 	end
 

@@ -38,11 +38,14 @@ local Panels = {}
 -- Rows named SettingRow_<Key>. Music/Sfx are 0..1 drag sliders; the rest are
 -- toggles that snap between empty and full.
 local SETTING_KIND = {
-	Music = "slider", Sfx = "slider",
-	MuteToilets = "toggle", AutoPoop = "toggle", AutoCash = "toggle",
+	Music = "slider",
+	Sfx = "slider",
+	MuteToilets = "toggle",
+	AutoPoop = "toggle",
+	AutoCash = "toggle",
 }
 
-local TOGGLE_ON  = Color3.fromRGB(30, 255, 0)
+local TOGGLE_ON = Color3.fromRGB(30, 255, 0)
 local TOGGLE_OFF = Color3.fromRGB(26, 26, 26)
 
 -- Music/Sfx are drag sliders (SliderTrack); the rest are switches (SettingToggle)
@@ -55,7 +58,8 @@ local function setSliderVisual(row: Frame, value: number)
 		value = math.clamp(value, 0, 1)
 		if fill then fill.Size = UDim2.new(value, 0, 1, 0) end
 		if knob then
-			knob.Position = UDim2.new(value, -knob.Size.X.Offset / 2, knob.Position.Y.Scale, knob.Position.Y.Offset)
+			knob.Position =
+				UDim2.new(value, -knob.Size.X.Offset / 2, knob.Position.Y.Scale, knob.Position.Y.Offset)
 		end
 		return
 	end
@@ -69,9 +73,16 @@ local function setSliderVisual(row: Frame, value: number)
 	}):Play()
 	if knob then
 		local travel = toggle.Size.X.Offset - knob.Size.X.Offset - 8
-		TweenService:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-			Position = UDim2.new(0, on and (4 + travel) or 4, knob.Position.Y.Scale, knob.Position.Y.Offset),
-		}):Play()
+		TweenService
+			:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+				Position = UDim2.new(
+					0,
+					on and (4 + travel) or 4,
+					knob.Position.Y.Scale,
+					knob.Position.Y.Offset
+				),
+			})
+			:Play()
 	end
 end
 
@@ -118,8 +129,13 @@ local function bindSettingRow(row: Frame, key: string)
 			Audio.play("UiClick", { volume = 0.5 })
 		end)
 		UserInputService.InputEnded:Connect(function(input)
-			if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1
-				or input.UserInputType == Enum.UserInputType.Touch) then
+			if
+				dragging
+				and (
+					input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch
+				)
+			then
 				dragging = false
 				commit(valueFromX(input.Position.X))
 			end
@@ -173,8 +189,8 @@ local function refreshProfile()
 	local d = State.data
 	local rows = {
 		Networth = "$" .. Format.cash(d.cash),
-		Toilets  = ("%d / %d slots"):format(#(d.toilets or {}), d.slots or 8),
-		Time     = Format.duration((d.stats and d.stats.playtime) or 0),
+		Toilets = ("%d / %d slots"):format(#(d.toilets or {}), d.slots or 8),
+		Time = Format.duration((d.stats and d.stats.playtime) or 0),
 	}
 	for _, row in ipairs(panel:GetChildren()) do
 		local key = row.Name:match("^StatRow_(.+)$")
@@ -212,8 +228,10 @@ local function initCodes()
 		box.ClearTextOnFocus = false
 		box.ZIndex = 20
 		local pad = Instance.new("UIPadding")
-		pad.PaddingLeft = UDim.new(0, 18); pad.PaddingRight = UDim.new(0, 18)
-		pad.PaddingTop = UDim.new(0, 12); pad.PaddingBottom = UDim.new(0, 12)
+		pad.PaddingLeft = UDim.new(0, 18)
+		pad.PaddingRight = UDim.new(0, 18)
+		pad.PaddingTop = UDim.new(0, 12)
+		pad.PaddingBottom = UDim.new(0, 12)
 		pad.Parent = box
 		box.Parent = inputFrame
 	end
@@ -230,10 +248,14 @@ local function initCodes()
 		box.Text = ""
 	end
 
-	box.FocusLost:Connect(function(enter) if enter then submit() end end)
+	box.FocusLost:Connect(function(enter)
+		if enter then submit() end
+	end)
 	if redeem then
 		UIKit.makeInteractive(redeem, submit, {
-			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
 		})
 	end
 end
@@ -253,8 +275,7 @@ local function refreshRebirth()
 	if box then
 		local value = box:FindFirstChild("RequirementValue") :: TextLabel?
 		if value then
-			value.Text = cost
-				and ("$%s / %s"):format(Format.short(d.cash), Format.short(cost))
+			value.Text = cost and ("$%s / %s"):format(Format.short(d.cash), Format.short(cost))
 				or "MAX REBIRTH"
 		end
 		local track = box:FindFirstChild("ProgressTrack") :: Frame?
@@ -297,7 +318,9 @@ local function refreshRebirth()
 			label.TextColor3 = Color3.new(1, 1, 1)
 			label.ZIndex = 30
 			local s = Instance.new("UIStroke")
-			s.Thickness = 3; s.Color = Color3.new(0, 0, 0); s.Parent = label
+			s.Thickness = 3
+			s.Color = Color3.new(0, 0, 0)
+			s.Parent = label
 			label.Parent = card
 		end
 		label.Text = text
@@ -339,7 +362,11 @@ local function initRebirth()
 			Audio.play("Rebirth")
 			Net.event(Net.NAMES.Rebirth):FireServer()
 			Screens.close("RebirthScreen")
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 	-- Skip: rebirth without having earned the cash, for Robux. The grant runs through
 	-- ProcessReceipt on the server (PassService.onProduct "InstantRebirth"), never
@@ -358,7 +385,11 @@ local function initRebirth()
 				return
 			end
 			MarketplaceService:PromptProductPurchase(player, PRODUCT_INSTANT_REBIRTH)
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 end
 
@@ -376,7 +407,11 @@ local function initWelcomeBack()
 			Audio.play("UiClick")
 			Net.event(Net.NAMES.ClaimOffline):FireServer(false)
 			Screens.close("WelcomeBackScreen")
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 	if double then
 		-- the x2 claim is granted by the dev product receipt, never by the client
@@ -388,7 +423,11 @@ local function initWelcomeBack()
 				return
 			end
 			MarketplaceService:PromptProductPurchase(player, id)
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 
 		-- Show the real buyer price. The authored label is called RobuxAmount, not
 		-- Price, so this only ever looked at a name that does not exist and the mockup
@@ -421,7 +460,9 @@ local function initWelcomeBack()
 			footer.TextSize = 26
 			footer.TextColor3 = Color3.fromRGB(200, 200, 210)
 			local s = Instance.new("UIStroke")
-			s.Thickness = 2.5; s.Color = Color3.new(0, 0, 0); s.Parent = footer
+			s.Thickness = 2.5
+			s.Color = Color3.new(0, 0, 0)
+			s.Parent = footer
 			footer.Parent = panel
 		end
 		footer.Text = ("You were away for %s"):format(Format.duration(payload.seconds))

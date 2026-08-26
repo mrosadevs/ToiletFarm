@@ -21,8 +21,8 @@ local AUTOSAVE = 90
 -- Comfortably longer than one autosave cycle, so a live server that is merely slow
 -- is never mistaken for a dead one. Only a hard crash leaves a lock to time out;
 -- an orderly shutdown releases it through the final save.
-local LOCK_STALE = 240       -- seconds before an unrefreshed lock may be taken
-local LOAD_ATTEMPTS = 6      -- how many times to wait for a live lock to release
+local LOCK_STALE = 240 -- seconds before an unrefreshed lock may be taken
+local LOAD_ATTEMPTS = 6 -- how many times to wait for a live lock to release
 local LOAD_RETRY_WAIT = 5
 
 local store = DataStoreService:GetDataStore(STORE_NAME)
@@ -43,51 +43,55 @@ local loading: { [Player]: boolean } = {}
 
 function DataService.default()
 	local upgrades = {}
-	for key in pairs(Config.UPGRADES) do upgrades[key] = 0 end
+	for key in pairs(Config.UPGRADES) do
+		upgrades[key] = 0
+	end
 	local perks = {}
-	for _, p in ipairs(Config.TOKEN_PERKS) do perks[p.id] = 0 end
+	for _, p in ipairs(Config.TOKEN_PERKS) do
+		perks[p.id] = 0
+	end
 	return {
-		cash          = 10,
+		cash = 10,
 		-- `poops` is the total VALUE carried (what the basket shows, e.g. 162.21K).
 		-- `poopItems` is how many physical poops that is, and it's the count the
 		-- Septic Capacity cap applies to — one T30 poop is worth 10Qa, so capping
 		-- on value would mean the tank fills on a single drop.
-		poops         = 0,
-		poopItems     = 0,
-		rebirths      = 0,
-		tokens        = 0,
-		buyTier       = 1,      -- what tier the Buy pads sell; raised at the Upgrade pad
+		poops = 0,
+		poopItems = 0,
+		rebirths = 0,
+		tokens = 0,
+		buyTier = 1, -- what tier the Buy pads sell; raised at the Upgrade pad
 
-		toilets       = {},     -- { {tier=n, mut="None", slot=n}, ... }
-		processing    = 0,      -- selling-rate level, wiped on rebirth
+		toilets = {}, -- { {tier=n, slot=n}, ... }
+		processing = 0, -- selling-rate level, wiped on rebirth
 		-- Cash that finished processing and is waiting on the Collect Cash pad, plus
 		-- the selling queue still draining. EconomyService owns these at runtime and
 		-- folds them back in through DataService.onSerialize before every save.
-		pendingCash   = 0,
-		queuePoops    = 0,
+		pendingCash = 0,
+		queuePoops = 0,
 		-- the same queue counted in poops rather than in value, so the selling sign
 		-- can quote the number the basket and the deposit banner use
-		queueItems    = 0,
-		queueCash     = 0,
-		upgrades      = upgrades,
-		perks         = perks,
-		discovered    = {},     -- ["T01_PorcelainStarter"] = true
-		luckyInv      = {},     -- { {id="Basic", uid="..."} }
-		codes         = {},
+		queueItems = 0,
+		queueCash = 0,
+		upgrades = upgrades,
+		perks = perks,
+		discovered = {}, -- ["T01_PorcelainStarter"] = true
+		luckyInv = {}, -- { {id="Basic", uid="..."} }
+		codes = {},
 		-- PurchaseIds already granted, so a retried receipt is never paid out twice.
 		-- Trimmed to the newest RECEIPT_HISTORY entries; Roblox stops retrying long
 		-- before a player could push that many purchases through.
-		receipts      = {},
+		receipts = {},
 		-- AutoPoop/AutoCash default ON. They do nothing without the matching gamepass,
 		-- so the toggle is an opt-out for owners rather than a second thing to find
 		-- before a purchase starts working.
-		settings      = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = true, AutoCash = true },
+		settings = { Music = 0.5, Sfx = 0.8, MuteToilets = false, AutoPoop = true, AutoCash = true },
 		-- The Roblox event this player has already been shown the RSVP dialog for.
 		-- The id rather than a boolean, so announcing a NEW event asks once more
 		-- instead of a single flag silencing every event this game ever runs.
-		eventPrompt   = "",
-		stats         = { playtime = 0, totalDeposited = 0, bestCash = 0 },
-		tutorial      = 1,      -- current step index; 0 once finished
+		eventPrompt = "",
+		stats = { playtime = 0, totalDeposited = 0, bestCash = 0 },
+		tutorial = 1, -- current step index; 0 once finished
 		-- What AnalyticsService has already reported for this player. Both of the
 		-- events these guard are scoped to a player's LIFETIME rather than to a
 		-- session, so the high-water marks have to survive a rejoin and a server hop
@@ -95,19 +99,19 @@ function DataService.default()
 		-- player ever touched. `onboard` is the highest onboarding funnel step sent,
 		-- `run` the highest rebirth level a progression Start was sent for. Nothing
 		-- in the game reads either one.
-		analytics     = { onboard = 0, run = 0 },
+		analytics = { onboard = 0, run = 0 },
 		-- os.time() of the last free-money chest claim. Persisted because an
 		-- uptime-based cooldown resets every time the player changes server.
-		lastChestAt   = 0,
+		lastChestAt = 0,
 		-- os.time() of the last group-pad payout, persisted for the same reason
 		lastGroupRewardAt = 0,
-		lastLogout    = 0,
+		lastLogout = 0,
 		-- Two rates, because offline pay has to arrive in both currencies: the value
 		-- the basket banks and the item count the basket displays. Crediting only the
 		-- value made Claim look like it did nothing at all.
-		rateAtLogout  = 0,
+		rateAtLogout = 0,
 		itemRateAtLogout = 0,
-		version       = 1,
+		version = 1,
 	}
 end
 
@@ -117,7 +121,9 @@ end
 local function deepCopy(v: any): any
 	if type(v) ~= "table" then return v end
 	local out = {}
-	for k, inner in pairs(v) do out[k] = deepCopy(inner) end
+	for k, inner in pairs(v) do
+		out[k] = deepCopy(inner)
+	end
 	return out
 end
 
@@ -166,18 +172,28 @@ function DataService.isLoaded(player: Player): boolean
 end
 
 -- Push state to the owning client. `partial` lets a hot path send just what changed.
-function DataService.push(player: Player, partial: {[string]: any}?)
+function DataService.push(player: Player, partial: { [string]: any }?)
 	local p = profiles[player]
 	if not p then return end
 	if partial then
 		StateChanged:FireClient(player, partial)
 	else
 		StateChanged:FireClient(player, {
-			cash = p.cash, poops = p.poops, poopItems = p.poopItems, rebirths = p.rebirths,
-			tokens = p.tokens, processing = p.processing, buyTier = p.buyTier,
-			toilets = p.toilets, upgrades = p.upgrades, perks = p.perks,
-			discovered = p.discovered, luckyInv = p.luckyInv, settings = p.settings,
-			stats = p.stats, tutorial = p.tutorial,
+			cash = p.cash,
+			poops = p.poops,
+			poopItems = p.poopItems,
+			rebirths = p.rebirths,
+			tokens = p.tokens,
+			processing = p.processing,
+			buyTier = p.buyTier,
+			toilets = p.toilets,
+			upgrades = p.upgrades,
+			perks = p.perks,
+			discovered = p.discovered,
+			luckyInv = p.luckyInv,
+			settings = p.settings,
+			stats = p.stats,
+			tutorial = p.tutorial,
 			carryCap = DataService.carryCap(player),
 			slots = DataService.slots(player),
 			maxTier = Config.maxBuyableTier(p.rebirths),
@@ -190,7 +206,7 @@ function DataService.push(player: Player, partial: {[string]: any}?)
 end
 
 -- mutate + push in one call so nothing can change state and forget to replicate
-function DataService.update(player: Player, fn: (any) -> ({[string]: any}?))
+function DataService.update(player: Player, fn: (any) -> { [string]: any }?)
 	local p = profiles[player]
 	if not p then return end
 	local partial = fn(p)
@@ -233,13 +249,19 @@ function DataService.incomeMultiplier(player: Player): number
 	if not p then return 1 end
 	local m = Config.rebirthMultiplier(p.rebirths)
 	m *= 1 + 0.05 * (p.perks.RichDiet or 0)
-	if DataService.hasPass(player, "DoublePoop") then m *= 2 end
+	if DataService.hasPass(player, "DoublePoop") then
+		m *= 2
+	end
 	-- full toilet Index is a permanent +25%
 	local found = 0
 	for t = 1, Config.MAX_TIER do
-		if p.discovered[Config.assetId(t)] then found += 1 end
+		if p.discovered[Config.assetId(t)] then
+			found += 1
+		end
 	end
-	if found >= Config.MAX_TIER then m *= (1 + Config.INDEX_ALL_TOILETS_BONUS) end
+	if found >= Config.MAX_TIER then
+		m *= (1 + Config.INDEX_ALL_TOILETS_BONUS)
+	end
 	return m
 end
 
@@ -250,7 +272,9 @@ function DataService.cashMultiplier(player: Player): number
 	local p = profiles[player]
 	if not p then return 1 end
 	local m = 1
-	if DataService.hasPass(player, "DoubleCash") then m *= 2 end
+	if DataService.hasPass(player, "DoubleCash") then
+		m *= 2
+	end
 	return m
 end
 
@@ -264,7 +288,7 @@ function DataService.poopRate(player: Player): number
 	local total = 0
 	for _, t in ipairs(p.toilets) do
 		local interval = Config.dropInterval(t.tier) * speed
-		local value = Config.poopValue(t.tier) * valueUp * (Config.MUTATIONS[t.mut] or 1) * mult
+		local value = Config.poopValue(t.tier) * valueUp * mult
 		total += value / interval
 	end
 	return total
@@ -293,7 +317,9 @@ end
 -- dearer as you rebirth into more income.
 function DataService.poopRateBase(player: Player): number
 	local rate = DataService.poopRate(player)
-	if DataService.hasPass(player, "DoublePoop") then rate /= 2 end
+	if DataService.hasPass(player, "DoublePoop") then
+		rate /= 2
+	end
 	return rate
 end
 
@@ -302,9 +328,9 @@ end
 -- is the only one allowed near DataStoreService, so both halves live here and
 -- LeaderboardService merely renders what it is handed.
 local BOARD_STORES = {
-	Networth   = "TF_Board_Networth_v1",
-	Toilets    = "TF_Board_Toilets_v1",
-	Playtime   = "TF_Board_Playtime_v1",
+	Networth = "TF_Board_Networth_v1",
+	Toilets = "TF_Board_Toilets_v1",
+	Playtime = "TF_Board_Playtime_v1",
 }
 
 -- An OrderedDataStore value must be a signed 64-bit integer, and late-game cash in
@@ -379,7 +405,10 @@ end
 
 -- Top `count` for a board, best first. Returns an empty list rather than throwing if
 -- the store is unreachable, so a leaderboard is never worse than blank.
-function DataService.topScores(board: string, count: number): { { userId: number, name: string, value: number } }
+function DataService.topScores(
+	board: string,
+	count: number
+): { { userId: number, name: string, value: number } }
 	local out = {}
 	local s = orderedStore(board)
 	if not s or studioNoApi then return out end
@@ -392,13 +421,13 @@ function DataService.topScores(board: string, count: number): { { userId: number
 		return out
 	end
 
-	local okPage, page = pcall(function() return pages:GetCurrentPage() end)
+	local okPage, page = pcall(function()
+		return pages:GetCurrentPage()
+	end)
 	if not okPage then return out end
 	for _, entry in ipairs(page) do
 		local userId = tonumber(entry.key)
-		if userId then
-			table.insert(out, { userId = userId, name = nameFor(userId), value = entry.value })
-		end
+		if userId then table.insert(out, { userId = userId, name = nameFor(userId), value = entry.value }) end
 	end
 	return out
 end
@@ -426,7 +455,7 @@ local function loadProfile(player: Player): any
 			local function claim(saved: any): (any, { number }?, any)
 				if lockIsForeign(saved) then
 					blocked = true
-					return nil, nil, nil   -- leave it alone; another live server owns it
+					return nil, nil, nil -- leave it alone; another live server owns it
 				end
 				saved = saved or {}
 				saved.lock = { jobId = JOB_ID, heartbeat = os.time() }
@@ -445,8 +474,10 @@ local function loadProfile(player: Player): any
 			if isApiDisabled(err) then
 				if not studioNoApi then
 					studioNoApi = true
-					warn("[DataService] Studio API access is off — running with in-memory saves. " ..
-						"Turn on Game Settings → Security → Enable Studio Access to API Services to test real saving.")
+					warn(
+						"[DataService] Studio API access is off — running with in-memory saves. "
+							.. "Turn on Game Settings → Security → Enable Studio Access to API Services to test real saving."
+					)
 				end
 				data = nil
 				claimed = true
@@ -548,9 +579,13 @@ function DataService.init()
 		local stats = Instance.new("Folder")
 		stats.Name = "leaderstats"
 		local cash = Instance.new("NumberValue")
-		cash.Name = "Cash"; cash.Value = profile.cash; cash.Parent = stats
+		cash.Name = "Cash"
+		cash.Value = profile.cash
+		cash.Parent = stats
 		local rb = Instance.new("IntValue")
-		rb.Name = "Rebirths"; rb.Value = profile.rebirths; rb.Parent = stats
+		rb.Name = "Rebirths"
+		rb.Value = profile.rebirths
+		rb.Parent = stats
 		stats.Parent = player
 	end)
 
@@ -589,7 +624,11 @@ function DataService.init()
 		for player in pairs(profiles) do
 			DataService.save(player, true)
 		end
-		if RunService:IsStudio() then task.wait(1) else task.wait(3) end
+		if RunService:IsStudio() then
+			task.wait(1)
+		else
+			task.wait(3)
+		end
 	end)
 
 	-- A full push serialises the entire profile, so this is worth a limit even

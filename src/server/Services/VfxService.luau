@@ -30,8 +30,8 @@ local DEFAULT_BURST = 18
 
 -- key used by callers -> model name authored in ServerStorage.Assets.Vfx
 local EFFECTS = {
-	merge    = "merge effect",
-	cash     = "cash effect",
+	merge = "merge effect",
+	cash = "cash effect",
 	confetti = "confetti effect",
 }
 

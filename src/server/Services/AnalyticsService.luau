@@ -72,11 +72,11 @@ local function rebirthBucket(rebirths: number): string
 end
 
 local PLAYTIME_BUCKETS = {
-	{ under = 600,   label = "0-10m"  },
-	{ under = 1800,  label = "10-30m" },
-	{ under = 3600,  label = "30-60m" },
-	{ under = 10800, label = "1-3h"   },
-	{ under = 36000, label = "3-10h"  },
+	{ under = 600, label = "0-10m" },
+	{ under = 1800, label = "10-30m" },
+	{ under = 3600, label = "30-60m" },
+	{ under = 10800, label = "1-3h" },
+	{ under = 36000, label = "3-10h" },
 }
 
 local function playtimeBucket(seconds: number): string
@@ -94,8 +94,12 @@ local function report(label: string, fn: any, ...)
 	local ok, err = pcall(fn, Reporter, ...)
 	if not ok and not warned[label] then
 		warned[label] = true
-		warn(("[Analytics] %s failed; it will not be reported again on this server: %s")
-			:format(label, tostring(err)))
+		warn(
+			("[Analytics] %s failed; it will not be reported again on this server: %s"):format(
+				label,
+				tostring(err)
+			)
+		)
 	end
 end
 
@@ -105,15 +109,15 @@ end
 -- order would then decide whether the session-end event had any context left to
 -- report with.
 type Session = {
-	id: string,        -- funnel session id for the playtime funnel
-	joined: number,    -- os.clock() when the session began
+	id: string, -- funnel session id for the playtime funnel
+	joined: number, -- os.clock() when the session began
 	milestone: number, -- how many playtime milestones have been reported
-	runId: string,     -- funnel session id for the rebirth attempt in progress
-	runLevel: number,  -- which rebirth that attempt is for
-	runStep: number,   -- highest rebirth-run step already reported
-	rebirths: number,  -- mirrored from the profile for the two context fields
+	runId: string, -- funnel session id for the rebirth attempt in progress
+	runLevel: number, -- which rebirth that attempt is for
+	runStep: number, -- highest rebirth-run step already reported
+	rebirths: number, -- mirrored from the profile for the two context fields
 	playtime: number,
-	cash: number,      -- mirrored so a pooled flush at leave has a closing balance
+	cash: number, -- mirrored so a pooled flush at leave has a closing balance
 	payer: boolean,
 }
 
@@ -127,7 +131,11 @@ local function context(player: Player, detail: string?): { [string]: string }
 	end
 	local third = detail
 	if not third then
-		if payer then third = "payer" else third = "free" end
+		if payer then
+			third = "payer"
+		else
+			third = "free"
+		end
 	end
 	return {
 		[F1] = rebirthBucket(rebirths),
@@ -165,8 +173,14 @@ local function onboarding(player: Player, step: number, stepName: string)
 	if step <= p.analytics.onboard then return end
 	p.analytics.onboard = step
 	DataService.push(player, { analytics = p.analytics })
-	report("onboarding:" .. stepName, Reporter.LogOnboardingFunnelStepEvent,
-		player, step, stepName, context(player))
+	report(
+		"onboarding:" .. stepName,
+		Reporter.LogOnboardingFunnelStepEvent,
+		player,
+		step,
+		stepName,
+		context(player)
+	)
 end
 
 -- Called by TutorialService with the index of the step just COMPLETED.
@@ -213,8 +227,16 @@ local function runStep(player: Player, step: number, name: string)
 	local s = sessions[player]
 	if not s or step <= s.runStep then return end
 	s.runStep = step
-	report("run:" .. name, Reporter.LogFunnelStepEvent,
-		player, FUNNELS.RebirthRun, s.runId, step, name, context(player))
+	report(
+		"run:" .. name,
+		Reporter.LogFunnelStepEvent,
+		player,
+		FUNNELS.RebirthRun,
+		s.runId,
+		step,
+		name,
+		context(player)
+	)
 end
 
 -- A rebirth attempt is scoped to a sitting, not to the whole run: the funnel
@@ -228,7 +250,7 @@ local function startRun(player: Player, p: any)
 	s.runId = HttpService:GenerateGUID(false)
 	s.runLevel = p.rebirths + 1
 	s.runStep = 0
-	if not Config.rebirthCost(p.rebirths) then return end   -- maxed: no run to be on
+	if not Config.rebirthCost(p.rebirths) then return end -- maxed: no run to be on
 	runStep(player, 1, "RunStart")
 
 	-- The progression event is the opposite scope: once per level for the player's
@@ -239,16 +261,30 @@ local function startRun(player: Player, p: any)
 	if p.analytics and p.analytics.run < level then
 		p.analytics.run = level
 		DataService.push(player, { analytics = p.analytics })
-		report("progression:start", Reporter.LogProgressionStartEvent,
-			player, REBIRTH_PATH, level, ("Rebirth %d"):format(level), context(player))
+		report(
+			"progression:start",
+			Reporter.LogProgressionStartEvent,
+			player,
+			REBIRTH_PATH,
+			level,
+			("Rebirth %d"):format(level),
+			context(player)
+		)
 	end
 end
 
 -- Called by EconomyService once a rebirth has actually gone through.
 function AnalyticsService.rebirthed(player: Player, level: number)
 	runStep(player, REBIRTHED_STEP, "Rebirthed")
-	report("progression:complete", Reporter.LogProgressionCompleteEvent,
-		player, REBIRTH_PATH, level, ("Rebirth %d"):format(level), context(player))
+	report(
+		"progression:complete",
+		Reporter.LogProgressionCompleteEvent,
+		player,
+		REBIRTH_PATH,
+		level,
+		("Rebirth %d"):format(level),
+		context(player)
+	)
 	local p = DataService.get(player)
 	if p then
 		local s = sessions[player]
@@ -279,34 +315,62 @@ local function economy(
 	sku: string
 )
 	if amount <= 0 then return end
-	report("economy:" .. sku, Reporter.LogEconomyEvent,
-		player, flow, currency, amount, ending, transaction.Name, sku, context(player))
+	report(
+		"economy:" .. sku,
+		Reporter.LogEconomyEvent,
+		player,
+		flow,
+		currency,
+		amount,
+		ending,
+		transaction.Name,
+		sku,
+		context(player)
+	)
 end
 
 function AnalyticsService.cashEarned(
-	player: Player, amount: number, ending: number,
-	transaction: Enum.AnalyticsEconomyTransactionType, sku: string
+	player: Player,
+	amount: number,
+	ending: number,
+	transaction: Enum.AnalyticsEconomyTransactionType,
+	sku: string
 )
-	economy(player, Enum.AnalyticsEconomyFlowType.Source, CURRENCY_CASH,
-		amount, ending, transaction, sku)
+	economy(player, Enum.AnalyticsEconomyFlowType.Source, CURRENCY_CASH, amount, ending, transaction, sku)
 end
 
 function AnalyticsService.cashSpent(
-	player: Player, amount: number, ending: number,
-	transaction: Enum.AnalyticsEconomyTransactionType, sku: string
+	player: Player,
+	amount: number,
+	ending: number,
+	transaction: Enum.AnalyticsEconomyTransactionType,
+	sku: string
 )
-	economy(player, Enum.AnalyticsEconomyFlowType.Sink, CURRENCY_CASH,
-		amount, ending, transaction, sku)
+	economy(player, Enum.AnalyticsEconomyFlowType.Sink, CURRENCY_CASH, amount, ending, transaction, sku)
 end
 
 function AnalyticsService.tokensEarned(player: Player, amount: number, ending: number, sku: string)
-	economy(player, Enum.AnalyticsEconomyFlowType.Source, CURRENCY_TOKENS,
-		amount, ending, Enum.AnalyticsEconomyTransactionType.Gameplay, sku)
+	economy(
+		player,
+		Enum.AnalyticsEconomyFlowType.Source,
+		CURRENCY_TOKENS,
+		amount,
+		ending,
+		Enum.AnalyticsEconomyTransactionType.Gameplay,
+		sku
+	)
 end
 
 function AnalyticsService.tokensSpent(player: Player, amount: number, ending: number, sku: string)
-	economy(player, Enum.AnalyticsEconomyFlowType.Sink, CURRENCY_TOKENS,
-		amount, ending, Enum.AnalyticsEconomyTransactionType.Shop, sku)
+	economy(
+		player,
+		Enum.AnalyticsEconomyFlowType.Sink,
+		CURRENCY_TOKENS,
+		amount,
+		ending,
+		Enum.AnalyticsEconomyTransactionType.Shop,
+		sku
+	)
 end
 
 -- ── pooled cash ──────────────────────────────────────────────────────────
@@ -354,16 +418,30 @@ local function flushPools(player: Player, ending: number)
 	if earn then
 		pooledEarn[player] = nil
 		for sku, amount in pairs(earn) do
-			economy(player, Enum.AnalyticsEconomyFlowType.Source, CURRENCY_CASH,
-				amount, ending, Enum.AnalyticsEconomyTransactionType.Gameplay, sku)
+			economy(
+				player,
+				Enum.AnalyticsEconomyFlowType.Source,
+				CURRENCY_CASH,
+				amount,
+				ending,
+				Enum.AnalyticsEconomyTransactionType.Gameplay,
+				sku
+			)
 		end
 	end
 	local spend = pooledSpend[player]
 	if spend then
 		pooledSpend[player] = nil
 		for sku, amount in pairs(spend) do
-			economy(player, Enum.AnalyticsEconomyFlowType.Sink, CURRENCY_CASH,
-				amount, ending, Enum.AnalyticsEconomyTransactionType.Shop, sku)
+			economy(
+				player,
+				Enum.AnalyticsEconomyFlowType.Sink,
+				CURRENCY_CASH,
+				amount,
+				ending,
+				Enum.AnalyticsEconomyTransactionType.Shop,
+				sku
+			)
 		end
 	end
 end
@@ -375,10 +453,18 @@ end
 function AnalyticsService.robuxSpent(player: Player, productName: string, robux: number)
 	local s = sessions[player]
 	if s then s.payer = true end
-	report("robux", Reporter.LogEconomyEvent,
-		player, Enum.AnalyticsEconomyFlowType.Sink, "Robux", robux, 0,
-		Enum.AnalyticsEconomyTransactionType.IAP.Name, productName,
-		context(player, productName))
+	report(
+		"robux",
+		Reporter.LogEconomyEvent,
+		player,
+		Enum.AnalyticsEconomyFlowType.Sink,
+		"Robux",
+		robux,
+		0,
+		Enum.AnalyticsEconomyTransactionType.IAP.Name,
+		productName,
+		context(player, productName)
+	)
 end
 
 -- Gamepasses do not go through ProcessReceipt, so their purchase is reported from
@@ -394,8 +480,7 @@ end
 -- looking for. `detail` lands in field 3 and is under the same bounded-set rule as
 -- everything else here.
 function AnalyticsService.custom(player: Player, name: string, value: number?, detail: string?)
-	report("custom:" .. name, Reporter.LogCustomEvent,
-		player, name, value or 1, context(player, detail))
+	report("custom:" .. name, Reporter.LogCustomEvent, player, name, value or 1, context(player, detail))
 end
 
 -- ── the tick ─────────────────────────────────────────────────────────────
@@ -410,15 +495,22 @@ local function updateSession(player: Player, s: Session)
 	while s.milestone < #SESSION_MINUTES and minutes >= SESSION_MINUTES[s.milestone + 1] do
 		s.milestone += 1
 		local mark = SESSION_MINUTES[s.milestone]
-		report("session:" .. tostring(mark), Reporter.LogFunnelStepEvent,
-			player, FUNNELS.Session, s.id, s.milestone, ("Min%02d"):format(mark),
-			context(player))
+		report(
+			"session:" .. tostring(mark),
+			Reporter.LogFunnelStepEvent,
+			player,
+			FUNNELS.Session,
+			s.id,
+			s.milestone,
+			("Min%02d"):format(mark),
+			context(player)
+		)
 	end
 end
 
 local function updateRun(player: Player, s: Session, p: any)
 	local cost = Config.rebirthCost(p.rebirths)
-	if not cost then return end   -- at max rebirth there is no next one to climb to
+	if not cost then return end -- at max rebirth there is no next one to climb to
 	if s.runLevel ~= p.rebirths + 1 then
 		-- The level moved without coming through rebirthed(). Re-anchor rather than
 		-- go on reporting steps against the wrong cost.
@@ -440,7 +532,9 @@ function AnalyticsService.init()
 	Players.PlayerAdded:Connect(function(player)
 		-- DataService loads the profile on its own PlayerAdded, connected first
 		local deadline = os.clock() + 15
-		while not DataService.isLoaded(player) and os.clock() < deadline do task.wait(0.2) end
+		while not DataService.isLoaded(player) and os.clock() < deadline do
+			task.wait(0.2)
+		end
 		local p = DataService.get(player)
 		if not p or not player.Parent then return end
 		p.analytics = p.analytics or { onboard = 0, run = 0 }
@@ -451,7 +545,10 @@ function AnalyticsService.init()
 		-- already warmed that cache.
 		local payer = false
 		for _, has in pairs(DataService.ownedPasses(player)) do
-			if has then payer = true break end
+			if has then
+				payer = true
+				break
+			end
 		end
 
 		sessions[player] = {
@@ -487,8 +584,7 @@ function AnalyticsService.init()
 			-- In minutes, because that is the unit the question gets asked in. The
 			-- funnel above says which milestones a session passed; this says where
 			-- between two of them it actually ended.
-			AnalyticsService.custom(player, "SessionEnd",
-				math.floor((os.clock() - s.joined) / 60))
+			AnalyticsService.custom(player, "SessionEnd", math.floor((os.clock() - s.joined) / 60))
 			sessions[player] = nil
 		end
 	end)

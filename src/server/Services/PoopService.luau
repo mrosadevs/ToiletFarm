@@ -18,14 +18,13 @@ local PlotService = require(script.Parent.PlotService)
 local PassService = require(script.Parent.PassService)
 
 local PoopModels = ServerStorage.Assets:WaitForChild("Poops")
-local MutationPoops = ServerStorage.Assets:WaitForChild("MutationPoops")
 
 local PickupEvent = Net.event(Net.NAMES.PoopPickup)
 
 local PoopService = {}
 
 -- cached stand-ins, so we're not rebuilding a model hundreds of times
-local templateCache: { [string]: BasePart } = {}
+local templateCache: { [number]: BasePart } = {}
 
 -- how big a poop reads on the belt; Micro is tiny and Mega is huge on purpose
 local function targetSize(tier: number): number
@@ -152,31 +151,11 @@ local function buildTemplate(tier: number): BasePart
 	return root
 end
 
-local function templateFor(tier: number, mut: string): BasePart
-	local cacheKey = tier .. "|" .. mut
-	local cached = templateCache[cacheKey]
+local function templateFor(tier: number): BasePart
+	local cached = templateCache[tier]
 	if cached then return cached end
-
 	local final = buildTemplate(tier)
-	if mut ~= "None" then
-		local mutSource = MutationPoops:FindFirstChild("MUT_" .. mut .. "_Poop")
-		if mutSource then
-			for _, d in ipairs(mutSource:GetDescendants()) do
-				if d:IsA("Highlight") then
-					local h = d:Clone()
-					h.Adornee = nil
-					h.Parent = final
-				elseif d:IsA("ParticleEmitter") then
-					local a = final:FindFirstChild("Fx") or Instance.new("Attachment")
-					a.Name = "Fx"
-					a.Parent = final
-					d:Clone().Parent = a
-				end
-			end
-		end
-	end
-
-	templateCache[cacheKey] = final
+	templateCache[tier] = final
 	return final
 end
 
@@ -398,7 +377,7 @@ function PoopService.dropPoint(plot: Model, origin: Vector3): Vector3
 	return dropPointFor(plot, origin)
 end
 
-function PoopService.drop(plot: Model, origin: Vector3, tier: number, mut: string, value: number)
+function PoopService.drop(plot: Model, origin: Vector3, tier: number, value: number)
 	local bin = plot:FindFirstChild("WorldPoops")
 	if not bin then return end
 
@@ -413,14 +392,13 @@ function PoopService.drop(plot: Model, origin: Vector3, tier: number, mut: strin
 		end
 	end
 
-	local p = templateFor(tier, mut):Clone()
+	local p = templateFor(tier):Clone()
 	p.Name = "Poop"
 	p:SetAttribute("Value", value)
 	-- what it counts as in the basket, which is not the same thing as what it is
 	-- worth: see Config.poopCount
 	p:SetAttribute("Count", Config.poopCount(tier))
 	p:SetAttribute("Tier", tier)
-	p:SetAttribute("Mutation", mut)
 	p:SetAttribute("Born", os.clock())
 
 	-- Drop it and let physics carry it: onto the belt, along to the collection area,

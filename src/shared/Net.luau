@@ -42,37 +42,37 @@ end
 -- Canonical remote names, so a typo is a nil index rather than a silent dead remote.
 Net.NAMES = {
 	-- server -> client
-	StateChanged   = "StateChanged",   -- full/partial profile state push
-	PoopPickup     = "PoopPickup",     -- {amount, worldPos} for the +N popup
-	CashCollected  = "CashCollected",  -- {amount, worldPos} for the coin burst
-	Deposited      = "Deposited",      -- {poops, cash, multiplier}
-	Discovered     = "Discovered",     -- {key, name, rarity}
-	FlushMeter     = "FlushMeter",     -- {mult, nextRollAt}
-	LuckyPrompt    = "LuckyPrompt",    -- {blockId, uid}
-	LuckyResult    = "LuckyResult",    -- {mutation, blockId}
-	TutorialStep   = "TutorialStep",   -- {index, title, subtitle, progress, goal, done}
-	OfflineReport  = "OfflineReport",  -- {poops, seconds}
-	Toast          = "Toast",          -- {text, kind}
-	MergeResult    = "MergeResult",    -- {tier, count}
+	StateChanged = "StateChanged", -- full/partial profile state push
+	PoopPickup = "PoopPickup", -- {amount, worldPos} for the +N popup
+	CashCollected = "CashCollected", -- {amount, worldPos} for the coin burst
+	Deposited = "Deposited", -- {poops, cash, multiplier}
+	Discovered = "Discovered", -- {key, name, rarity}
+	FlushMeter = "FlushMeter", -- {mult, nextRollAt}
+	LuckyPrompt = "LuckyPrompt", -- {blockId, uid}
+	LuckyResult = "LuckyResult", -- {mutation, blockId}
+	TutorialStep = "TutorialStep", -- {index, title, subtitle, progress, goal, done}
+	OfflineReport = "OfflineReport", -- {poops, seconds}
+	Toast = "Toast", -- {text, kind}
+	MergeResult = "MergeResult", -- {tier, count}
 	PromptGroupJoin = "PromptGroupJoin", -- {groupId} -- the join prompt is client-only
 	PromptEventRsvp = "PromptEventRsvp", -- {eventId} -- the RSVP dialog is client-only
-	PlayVfx        = "PlayVfx",        -- {key, position, burst} -- built and emitted client-side
+	PlayVfx = "PlayVfx", -- {key, position, burst} -- built and emitted client-side
 
 	-- client -> server
-	BuyToilet      = "BuyToilet",
-	Merge          = "Merge",
-	Rebirth        = "Rebirth",
-	Deposit        = "Deposit",
-	CollectCash    = "CollectCash",
-	BuyUpgrade     = "BuyUpgrade",
-	OpenLucky      = "OpenLucky",
-	DiscardLucky   = "DiscardLucky",
-	RedeemCode     = "RedeemCode",
-	SetSetting     = "SetSetting",
-	ClaimOffline   = "ClaimOffline",
-	RequestState   = "RequestState",
-	TeleportHome   = "TeleportHome",
-	BuyTokenPerk   = "BuyTokenPerk",
+	BuyToilet = "BuyToilet",
+	Merge = "Merge",
+	Rebirth = "Rebirth",
+	Deposit = "Deposit",
+	CollectCash = "CollectCash",
+	BuyUpgrade = "BuyUpgrade",
+	OpenLucky = "OpenLucky",
+	DiscardLucky = "DiscardLucky",
+	RedeemCode = "RedeemCode",
+	SetSetting = "SetSetting",
+	ClaimOffline = "ClaimOffline",
+	RequestState = "RequestState",
+	TeleportHome = "TeleportHome",
+	BuyTokenPerk = "BuyTokenPerk",
 }
 
 return Net

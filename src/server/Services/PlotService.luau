@@ -13,7 +13,6 @@ local DataService = require(script.Parent.DataService)
 
 local Assets = ServerStorage:WaitForChild("Assets")
 local ToiletModels = Assets:WaitForChild("Toilets")
-local MutationModels = Assets:WaitForChild("Mutations")
 
 local PlotService = {}
 
@@ -349,32 +348,7 @@ function PlotService.stall(plot: Model, slot: number): Model?
 end
 
 -- ── toilet models ─────────────────────────────────────────────────────────
-local function applyMutationLook(model: Model, mut: string)
-	if mut == "None" then return end
-	local source = MutationModels:FindFirstChild("MUT_" .. mut)
-	if not source then return end
-	-- copy the Highlight and any ParticleEmitters off the mutation demo model
-	local target = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
-	if not target then return end
-	for _, d in ipairs(source:GetDescendants()) do
-		if d:IsA("Highlight") then
-			local h = d:Clone()
-			h.Adornee = model
-			h.Parent = model
-		elseif d:IsA("ParticleEmitter") then
-			local a = target:FindFirstChild("MutFx") or Instance.new("Attachment")
-			a.Name = "MutFx"
-			a.Parent = target
-			d:Clone().Parent = a
-		end
-	end
-	if mut == "Rainbow" then
-		local src = source:FindFirstChild("RainbowCycle", true)
-		if src then src:Clone().Parent = model end
-	end
-end
-
-function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: string): Model?
+function PlotService.buildToilet(plot: Model, slot: number, tier: number): Model?
 	-- Validate everything BEFORE revealing the stall. Bailing out after the reveal
 	-- is the other way an empty stall ends up standing on the plot.
 	local stall = PlotService.stall(plot, slot)
@@ -403,7 +377,6 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 	local model = source:Clone()
 	model.Name = "Toilet"
 	model:SetAttribute("Tier", tier)
-	model:SetAttribute("Mutation", mut)
 	model:SetAttribute("Slot", slot)
 	for _, p in ipairs(model:GetDescendants()) do
 		if p:IsA("BasePart") then
@@ -438,8 +411,6 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 	local targetCF = CFrame.new(spot.Position + Vector3.new(0, size.Y / 2 + 0.05, 0)) * plotRot
 	model:PivotTo((targetCF * bcf:Inverse()) * model:GetPivot())
 
-	applyMutationLook(model, mut)
-
 	-- name plate over the stall
 	local topCF, topSize = model:GetBoundingBox()
 	local head = Instance.new("Part")
@@ -466,7 +437,7 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number, mut: s
 		name.Font = Enum.Font.FredokaOne
 		name.TextScaled = true
 		name.TextColor3 = Config.RARITY_COLORS[Config.rarityOf(tier)]
-		name.Text = (mut ~= "None" and (mut .. " ") or "") .. Config.displayName(tier)
+		name.Text = Config.displayName(tier)
 		local stroke = Instance.new("UIStroke")
 		stroke.Thickness = 2.5
 		stroke.Color = Color3.new(0, 0, 0)
@@ -524,7 +495,7 @@ function PlotService.rebuild(player: Player)
 		placed[plot][slot] = nil
 	end
 	for _, t in ipairs(p.toilets) do
-		PlotService.buildToilet(plot, t.slot, t.tier, t.mut)
+		PlotService.buildToilet(plot, t.slot, t.tier)
 	end
 	PlotService.refreshStalls(player)
 end

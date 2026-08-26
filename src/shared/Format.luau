@@ -17,9 +17,7 @@ function Format.short(n: number): string
 		-- 3 significant figures, trailing zeros trimmed
 		local decimals = scaled < 10 and 2 or (scaled < 100 and 1 or 0)
 		out = string.format("%." .. decimals .. "f", scaled)
-		if decimals > 0 then
-			out = out:gsub("%.?0+$", "")
-		end
+		if decimals > 0 then out = out:gsub("%.?0+$", "") end
 		out ..= SUFFIXES[idx + 1]
 	end
 	return (neg and "-" or "") .. out

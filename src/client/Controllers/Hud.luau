@@ -55,7 +55,9 @@ local function collectPacks()
 	-- Top to bottom = small, medium, large. This reads the AUTHORED offsets, so it
 	-- has to run before UIKit.pinEdges re-anchors these to the bottom edge and the
 	-- offsets stop being a screen ordering.
-	table.sort(packs, function(a, b) return a.Position.Y.Offset < b.Position.Y.Offset end)
+	table.sort(packs, function(a, b)
+		return a.Position.Y.Offset < b.Position.Y.Offset
+	end)
 
 	for index, chip in ipairs(packs) do
 		chip.Name = "CashPack" .. index
@@ -69,7 +71,9 @@ local function collectPacks()
 			MarketplaceService:PromptProductPurchase(player, id)
 		end, {
 			hover = 1.08,
-			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
 		})
 	end
 end
@@ -77,9 +81,7 @@ end
 local function refreshPacks(cash: number)
 	for index, chip in ipairs(packs) do
 		local label = chip:FindFirstChild("GainLabel", true) :: TextLabel?
-		if label then
-			label.Text = "+" .. Format.cash(Config.cashPackAmount(cash, index)) .. "$"
-		end
+		if label then label.Text = "+" .. Format.cash(Config.cashPackAmount(cash, index)) .. "$" end
 	end
 end
 
@@ -91,7 +93,9 @@ local function refresh(data: any, changed: any)
 			-- a drop in balance is the one reliable signal that something was bought,
 			-- and it catches every spend path (toilets, upgrades, buy tier, lucky unlock)
 			if data.cash < lastCash then Audio.play("MoneySpend", { volume = 0.7 }) end
-			UIKit.rollNumber(cashLabel, lastCash, data.cash, function(v) return "$" .. Format.cash(v) end)
+			UIKit.rollNumber(cashLabel, lastCash, data.cash, function(v)
+				return "$" .. Format.cash(v)
+			end)
 			UIKit.pop(cashLabel, 1.15)
 			lastCash = data.cash
 		elseif not changed.cash then
@@ -141,9 +145,7 @@ local function refresh(data: any, changed: any)
 	-- It used to show the income multiplier, which read as a label for the + button
 	-- and described something else entirely.
 	local multText = find("CashMultiplierText") :: TextLabel?
-	if multText then
-		multText.Text = "+" .. Format.cash(Config.cashPackAmount(data.cash, 1)) .. "$"
-	end
+	if multText then multText.Text = "+" .. Format.cash(Config.cashPackAmount(data.cash, 1)) .. "$" end
 
 	-- The green PERMANENT badge is a storefront for the x2 Cash gamepass, so it has
 	-- to advertise what you would GET. Writing the player's current multiplier here
@@ -194,14 +196,22 @@ function Hud.init()
 		UIKit.makeInteractive(index, function()
 			Audio.play("UiClick")
 			Screens.toggle("IndexScreen")
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 	local rebirth = C:FindFirstChild("RebirthButton")
 	if rebirth and rebirth:IsA("GuiObject") then
 		UIKit.makeInteractive(rebirth, function()
 			Audio.play("UiClick")
 			Screens.toggle("RebirthScreen")
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 	-- Home takes you back to your own island; it used to just re-request state,
 	-- and had no hover sound.
@@ -210,7 +220,11 @@ function Hud.init()
 		UIKit.makeInteractive(home, function()
 			Audio.play("UiClick")
 			Net.event(Net.NAMES.TeleportHome):FireServer()
-		end, { onHover = function() Audio.play("UiHover", { volume = 0.4 }) end })
+		end, {
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
+		})
 	end
 	-- The + by the balance is a buy-cash button, so it goes straight to the smallest
 	-- pack rather than opening a shop to pick from.
@@ -250,13 +264,14 @@ function Hud.init()
 			MarketplaceService:PromptGamePassPurchase(player, PASS_DOUBLE_CASH)
 		end, {
 			hover = 1.08,
-			onHover = function() Audio.play("UiHover", { volume = 0.4 }) end,
+			onHover = function()
+				Audio.play("UiHover", { volume = 0.4 })
+			end,
 		})
 	end
 
 	State.onChanged(refresh)
 	refresh(State.data, {})
-
 end
 
 return Hud

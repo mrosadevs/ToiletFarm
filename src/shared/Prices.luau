@@ -16,26 +16,26 @@ local Prices = {}
 -- Buyer-facing prices, straight from the Creator Dashboard "Current price" column.
 -- Update here whenever a price changes on the site.
 Prices.DASHBOARD = {
-	pass_AutoFlush   = 67,   -- Auto Collect Poops
-	pass_AutoCash    = 25,   -- Auto Collect Cash
-	pass_DoublePoop  = 399,  -- Double Poops
-	pass_DoubleCash  = 12,   -- x2 Cash
+	pass_AutoFlush = 67, -- Auto Collect Poops
+	pass_AutoCash = 25, -- Auto Collect Cash
+	pass_DoublePoop = 399, -- Double Poops
+	pass_DoubleCash = 12, -- x2 Cash
 
-	prod_FinishProcessing = 15,   -- Instant Poop Process
-	prod_PoopPack1        = 14,   -- Small Cash Pack
-	prod_PoopPack2        = 100,  -- Medium Cash Pack
-	prod_PoopPack3        = 720,  -- Large Cash Pack
-	prod_LuckyBasic       = 25,
-	prod_LuckyGreen       = 60,
-	prod_LuckyIce         = 120,
-	prod_LuckyPurple      = 250,
-	prod_LuckyWhite       = 599,
-	prod_DoubleOffline    = 67,   -- x2 Offline Poops (Welcome Back modal only)
+	prod_FinishProcessing = 15, -- Instant Poop Process
+	prod_PoopPack1 = 14, -- Small Cash Pack
+	prod_PoopPack2 = 100, -- Medium Cash Pack
+	prod_PoopPack3 = 720, -- Large Cash Pack
+	prod_LuckyBasic = 25,
+	prod_LuckyGreen = 60,
+	prod_LuckyIce = 120,
+	prod_LuckyPurple = 250,
+	prod_LuckyWhite = 599,
+	prod_DoubleOffline = 67, -- x2 Offline Poops (Welcome Back modal only)
 	-- Instant Rebirth, the Rebirth panel's Skip button. Derived, not read off the
 	-- dashboard: the API reports 90, and ceil(100 * 0.9) = 90 exactly, the same
 	-- relationship FinishProcessing confirms (buyer 15 -> API 14). Worth checking
 	-- against the dashboard's "Current price" column the next time it is open.
-	prod_InstantRebirth   = 100,
+	prod_InstantRebirth = 100,
 }
 
 local function read(key: string): number?

@@ -21,7 +21,7 @@ local Analytics = require(script.Parent.AnalyticsService)
 local BlockModels = ServerStorage.Assets:WaitForChild("LuckyBlocks")
 local PromptEvent = Net.event(Net.NAMES.LuckyPrompt)
 local ResultEvent = Net.event(Net.NAMES.LuckyResult)
-local ToastEvent  = Net.event(Net.NAMES.Toast)
+local ToastEvent = Net.event(Net.NAMES.Toast)
 
 local LuckyBlockService = {}
 
@@ -39,7 +39,6 @@ local function luckBonus(player: Player): number
 	local p = DataService.get(player)
 	if not p then return 0 end
 	local bonus = 0.10 * (p.perks.LuckyGut or 0)
-	if p.discovered["__ALL_MUTATIONS"] then bonus += Config.INDEX_ALL_MUTATIONS_LUCK end
 	return bonus
 end
 
@@ -76,7 +75,10 @@ function LuckyBlockService.spawnOnPlot(player: Player, blockId: string?)
 	local def = Config.luckyBlock(blockId)
 	if not def then return end
 	local source = BlockModels:FindFirstChild(def.model)
-	if not source then warn("[Lucky] missing model " .. def.model) return end
+	if not source then
+		warn("[Lucky] missing model " .. def.model)
+		return
+	end
 
 	-- A block comes OUT OF A TOILET and rides the belt down, exactly like a poop,
 	-- rather than materialising next to the player.
@@ -85,7 +87,7 @@ function LuckyBlockService.spawnOnPlot(player: Player, blockId: string?)
 		local m = PlotService.toiletModel(plot, t.slot)
 		if m then table.insert(owned, m) end
 	end
-	if #owned == 0 then return end   -- nothing to come out of yet
+	if #owned == 0 then return end -- nothing to come out of yet
 	local fromToilet = owned[math.random(#owned)]
 	-- Onto the belt, at the exact point a poop appears. This used to be the toilet's
 	-- own pivot, which is INSIDE the stall, so a 2.5 stud block spawned wedged under
@@ -214,14 +216,17 @@ function LuckyBlockService.unlockCost(player: Player, blockId: string): number
 		blockId,
 		LuckyBlockService.baseTier(player),
 		ToiletService.totalToilets(player),
-		p.cash)
+		p.cash
+	)
 end
 
 function LuckyBlockService.open(player: Player, blockUid: string, paidWithRobux: boolean?)
 	local p = DataService.get(player)
 	if not p then return end
 	local entry
-	for _, e in ipairs(p.luckyInv) do if e.uid == blockUid then entry = e end end
+	for _, e in ipairs(p.luckyInv) do
+		if e.uid == blockUid then entry = e end
+	end
 	if not entry then return end
 
 	-- The reward is a physical toilet, so it needs somewhere to go. Check before
@@ -241,14 +246,20 @@ function LuckyBlockService.open(player: Player, blockUid: string, paidWithRobux:
 			return
 		end
 		p.cash -= cost
-		Analytics.cashSpent(player, cost, p.cash, Enum.AnalyticsEconomyTransactionType.Shop, "LuckyUnlock_" .. entry.id)
+		Analytics.cashSpent(
+			player,
+			cost,
+			p.cash,
+			Enum.AnalyticsEconomyTransactionType.Shop,
+			"LuckyUnlock_" .. entry.id
+		)
 	end
 
 	takeFromInventory(player, blockUid)
 	-- paying Robux is what buys the luck, so it is read from the same flag that
 	-- waived the cash price rather than from anything the client sent
-	local tier, offset = LuckyBlockService.roll(player, entry.id,
-		paidWithRobux and Config.LUCKY_ROBUX_LUCK or nil)
+	local tier, offset =
+		LuckyBlockService.roll(player, entry.id, paidWithRobux and Config.LUCKY_ROBUX_LUCK or nil)
 
 	local slot, why = ToiletService.grant(player, tier)
 	if not slot then

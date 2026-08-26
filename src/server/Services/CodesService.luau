@@ -19,13 +19,13 @@ local CodesService = {}
 
 -- cash values are pre-multiplier; they get scaled by the player's rebirth multiplier
 CodesService.CODES = {
-	RELEASE   = { cash = 5000,  tokens = 1 },
-	FLUSH     = { cash = 2500 },
-	POOPY     = { cash = 1000 },
-	THRONE    = { lucky = "Green" },
-	GOLDEN    = { lucky = "Ice" },
-	LIKE1K    = { cash = 10000, tokens = 1 },
-	CLEANUP   = { cash = 7500 },
+	RELEASE = { cash = 5000, tokens = 1 },
+	FLUSH = { cash = 2500 },
+	POOPY = { cash = 1000 },
+	THRONE = { lucky = "Green" },
+	GOLDEN = { lucky = "Ice" },
+	LIKE1K = { cash = 10000, tokens = 1 },
+	CLEANUP = { cash = 7500 },
 }
 
 function CodesService.redeem(player: Player, raw: string)
@@ -51,7 +51,13 @@ function CodesService.redeem(player: Player, raw: string)
 		p.cash += amount
 		-- the code itself is the sku; CODES is a short fixed list, so this stays a
 		-- bounded set the dashboard can group by
-		Analytics.cashEarned(player, amount, p.cash, Enum.AnalyticsEconomyTransactionType.TimedReward, "Code_" .. code)
+		Analytics.cashEarned(
+			player,
+			amount,
+			p.cash,
+			Enum.AnalyticsEconomyTransactionType.TimedReward,
+			"Code_" .. code
+		)
 		table.insert(parts, "$" .. Format.cash(amount))
 	end
 	if reward.tokens then

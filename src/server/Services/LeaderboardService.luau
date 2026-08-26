@@ -43,9 +43,24 @@ local MEDAL = {
 -- authored header title -> the board key DataService publishes under, and how the
 -- number should read
 local BOARDS = {
-	["Networth"]     = { key = "Networth", format = function(v) return "$" .. Format.cash(v) end },
-	["Total Toilets"] = { key = "Toilets",  format = function(v) return Format.short(v) end },
-	["Time Played"]  = { key = "Playtime", format = function(v) return Format.duration(v) end },
+	["Networth"] = {
+		key = "Networth",
+		format = function(v)
+			return "$" .. Format.cash(v)
+		end,
+	},
+	["Total Toilets"] = {
+		key = "Toilets",
+		format = function(v)
+			return Format.short(v)
+		end,
+	},
+	["Time Played"] = {
+		key = "Playtime",
+		format = function(v)
+			return Format.duration(v)
+		end,
+	},
 }
 
 type Board = {
@@ -86,7 +101,12 @@ local function collect()
 			local template = list and list:FindFirstChild("Template")
 
 			if not spec then
-				warn(("[LeaderboardService] %s has an unrecognised title %q"):format(model.Name, tostring(title)))
+				warn(
+					("[LeaderboardService] %s has an unrecognised title %q"):format(
+						model.Name,
+						tostring(title)
+					)
+				)
 			elseif not (list and list:IsA("ScrollingFrame") and template and template:IsA("Frame")) then
 				warn(("[LeaderboardService] %s is missing its ScrollingFrame/Template"):format(model.Name))
 			else
@@ -129,7 +149,9 @@ local function localScores(key: string)
 			table.insert(out, { userId = player.UserId, name = player.Name, value = value })
 		end
 	end
-	table.sort(out, function(a, b) return a.value > b.value end)
+	table.sort(out, function(a, b)
+		return a.value > b.value
+	end)
 	return out
 end
 
@@ -202,9 +224,7 @@ end
 function LeaderboardService.refresh()
 	for _, board in ipairs(boards) do
 		local entries = DataService.topScores(board.key, ROWS)
-		if #entries == 0 then
-			entries = localScores(board.key)
-		end
+		if #entries == 0 then entries = localScores(board.key) end
 		render(board, entries)
 	end
 end
@@ -218,9 +238,7 @@ function LeaderboardService.init()
 		-- hub, then on the slow loop: these are web reads, not a per-frame job
 		while true do
 			local ok, err = pcall(LeaderboardService.refresh)
-			if not ok then
-				warn(("[LeaderboardService] refresh failed: %s"):format(tostring(err)))
-			end
+			if not ok then warn(("[LeaderboardService] refresh failed: %s"):format(tostring(err))) end
 			task.wait(REFRESH)
 		end
 	end)

@@ -17,9 +17,9 @@ local ToiletService = require(script.Parent.ToiletService)
 local Analytics = require(script.Parent.AnalyticsService)
 
 local DepositedEvent = Net.event(Net.NAMES.Deposited)
-local CashEvent      = Net.event(Net.NAMES.CashCollected)
-local ToastEvent     = Net.event(Net.NAMES.Toast)
-local OfflineEvent   = Net.event(Net.NAMES.OfflineReport)
+local CashEvent = Net.event(Net.NAMES.CashCollected)
+local ToastEvent = Net.event(Net.NAMES.Toast)
+local OfflineEvent = Net.event(Net.NAMES.OfflineReport)
 
 local EconomyService = {}
 
@@ -35,7 +35,7 @@ local pending: { [Player]: number } = {}
 -- and the offline modal had.
 local queuePoops: { [Player]: number } = {}
 local queueItems: { [Player]: number } = {}
-local queueCash:  { [Player]: number } = {}
+local queueCash: { [Player]: number } = {}
 -- What the offline modal is currently offering, so Claim can't be replayed for more.
 -- `offlineClaimed` keeps the amount after a plain claim so that a DoubleOffline
 -- purchase arriving afterwards can still pay the second half.
@@ -62,13 +62,9 @@ end
 function EconomyService.processItemRate(player: Player): number
 	local rate = EconomyService.processRate(player)
 	local value = queuePoops[player] or 0
-	if value > 0 then
-		return rate * ((queueItems[player] or 0) / value)
-	end
+	if value > 0 then return rate * ((queueItems[player] or 0) / value) end
 	local produced = DataService.poopRate(player)
-	if produced > 0 then
-		return rate * (DataService.poopItemRate(player) / produced)
-	end
+	if produced > 0 then return rate * (DataService.poopItemRate(player) / produced) end
 	return 0
 end
 
@@ -87,8 +83,12 @@ local function recountFriends()
 			local n = 0
 			for _, other in ipairs(players) do
 				if other ~= player then
-					local ok, isFriend = pcall(function() return player:IsFriendsWith(other.UserId) end)
-					if ok and isFriend then n += 1 end
+					local ok, isFriend = pcall(function()
+						return player:IsFriendsWith(other.UserId)
+					end)
+					if ok and isFriend then
+						n += 1
+					end
 				end
 			end
 			if player.Parent then friendCache[player] = n end
@@ -140,7 +140,7 @@ function EconomyService.deposit(player: Player)
 	-- into the selling queue, not straight to cash
 	queuePoops[player] = (queuePoops[player] or 0) + value
 	queueItems[player] = (queueItems[player] or 0) + items
-	queueCash[player]  = (queueCash[player] or 0) + cash
+	queueCash[player] = (queueCash[player] or 0) + cash
 
 	-- `count` drives the "Deposited X Poops!" banner, `value` drives the cash maths
 	DepositedEvent:FireClient(player, { poops = value, count = items, cash = cash, multiplier = meter })
@@ -169,9 +169,7 @@ function EconomyService.collectCash(player: Player, worldPos: Vector3?)
 	Analytics.cashEarnedPooled(player, amount, "PoopSales")
 	-- only for a real walk-on collection; Auto Collect fires this every tick with no
 	-- position and would otherwise spray particles continuously
-	if worldPos then
-		require(script.Parent.VfxService).play("cash", worldPos + Vector3.new(0, 2, 0))
-	end
+	if worldPos then require(script.Parent.VfxService).play("cash", worldPos + Vector3.new(0, 2, 0)) end
 	return amount
 end
 
@@ -218,8 +216,14 @@ function EconomyService.buyProcessing(player: Player)
 	if not p then return end
 	local level = p.processing or 0
 	local cost = Config.processCost(level)
-	if not cost then toast(player, "Processing is maxed!", "error") return end
-	if p.cash < cost then toast(player, "Not enough cash!", "error") return end
+	if not cost then
+		toast(player, "Processing is maxed!", "error")
+		return
+	end
+	if p.cash < cost then
+		toast(player, "Not enough cash!", "error")
+		return
+	end
 	p.cash -= cost
 	p.processing = level + 1
 	DataService.push(player, { cash = p.cash, processing = p.processing })
@@ -233,8 +237,14 @@ function EconomyService.buyUpgrade(player: Player, key: string)
 	if not p or not Config.UPGRADES[key] then return end
 	local level = p.upgrades[key] or 0
 	local cost = Config.upgradeCost(key, level)
-	if not cost then toast(player, "Already max level!", "error") return end
-	if p.cash < cost then toast(player, "Not enough cash!", "error") return end
+	if not cost then
+		toast(player, "Already max level!", "error")
+		return
+	end
+	if p.cash < cost then
+		toast(player, "Not enough cash!", "error")
+		return
+	end
 	p.cash -= cost
 	p.upgrades[key] = level + 1
 	if key == "PlotSlots" then PlotService.refreshStalls(player) end
@@ -252,8 +262,14 @@ function EconomyService.buyPerk(player: Player, id: string)
 	for _, perk in ipairs(Config.TOKEN_PERKS) do
 		if perk.id == id then
 			local owned = p.perks[id] or 0
-			if owned >= perk.max then toast(player, "Already maxed!", "error") return end
-			if p.tokens < perk.cost then toast(player, "Not enough Flush Tokens!", "error") return end
+			if owned >= perk.max then
+				toast(player, "Already maxed!", "error")
+				return
+			end
+			if p.tokens < perk.cost then
+				toast(player, "Not enough Flush Tokens!", "error")
+				return
+			end
 			p.tokens -= perk.cost
 			p.perks[id] = owned + 1
 			if id == "ExtraPlot" then PlotService.refreshStalls(player) end
@@ -279,8 +295,11 @@ function EconomyService.rebirth(player: Player)
 	if not p then return end
 	local ok, cost = EconomyService.canRebirth(player)
 	if not ok then
-		if not cost then toast(player, "You're at max rebirth!", "error")
-		else toast(player, "Not enough cash to rebirth!", "error") end
+		if not cost then
+			toast(player, "You're at max rebirth!", "error")
+		else
+			toast(player, "Not enough cash to rebirth!", "error")
+		end
 		return
 	end
 
@@ -294,8 +313,10 @@ function EconomyService.rebirth(player: Player)
 	p.poopItems = 0
 	p.toilets = {}
 	p.processing = 0
-	p.buyTier = 1   -- the ceiling grew, but you re-earn the tier itself each run
-	for key in pairs(Config.UPGRADES) do p.upgrades[key] = 0 end
+	p.buyTier = 1 -- the ceiling grew, but you re-earn the tier itself each run
+	for key in pairs(Config.UPGRADES) do
+		p.upgrades[key] = 0
+	end
 	pending[player] = 0
 	queuePoops[player] = 0
 	queueItems[player] = 0
@@ -305,7 +326,9 @@ function EconomyService.rebirth(player: Player)
 	if plot then
 		-- every stall on the plot, not a pasted 48: the ceiling moves with
 		-- Config.MAX_PLOT_SLOTS and a leftover toilet would be unreachable
-		for slot = 1, Config.MAX_PLOT_SLOTS do PlotService.clearToilet(plot, slot) end
+		for slot = 1, Config.MAX_PLOT_SLOTS do
+			PlotService.clearToilet(plot, slot)
+		end
 		local bin = plot:FindFirstChild("WorldPoops")
 		if bin then bin:ClearAllChildren() end
 	end
@@ -313,7 +336,7 @@ function EconomyService.rebirth(player: Player)
 	-- Head Start perk: begin the new run with one cap-tier toilet
 	if (p.perks.HeadStart or 0) > 0 then
 		local tier = Config.maxBuyableTier(p.rebirths)
-		table.insert(p.toilets, { tier = tier, mut = "None", slot = 1 })
+		table.insert(p.toilets, { tier = tier, slot = 1 })
 	end
 
 	PlotService.rebuild(player)
@@ -350,8 +373,11 @@ function EconomyService.upgradeBuyTier(player: Player)
 	local need = Config.buyTierRequirement(tier)
 	local owned = ToiletService.totalToilets(player)
 	if owned < need then
-		toast(player, ("Need %s toilets to upgrade (you have %s)")
-			:format(Format.short(need), Format.short(owned)), "error")
+		toast(
+			player,
+			("Need %s toilets to upgrade (you have %s)"):format(Format.short(need), Format.short(owned)),
+			"error"
+		)
 		return
 	end
 	local cost = Config.buyTierCost(tier)
@@ -394,14 +420,23 @@ function EconomyService.upgradeBuyTier(player: Player)
 	if sold > 0 then
 		refund = math.floor(refund)
 		p.cash += refund
-		toast(player, ("Sold %d stranded toilet%s for $%s")
-			:format(sold, sold == 1 and "" or "s", Format.cash(refund)), "reward")
+		toast(
+			player,
+			("Sold %d stranded toilet%s for $%s"):format(sold, sold == 1 and "" or "s", Format.cash(refund)),
+			"reward"
+		)
 	end
 
 	DataService.push(player)
 	Analytics.cashSpent(player, cost, p.cash, Enum.AnalyticsEconomyTransactionType.Shop, "BuyTier")
 	if sold > 0 then
-		Analytics.cashEarned(player, refund, p.cash, Enum.AnalyticsEconomyTransactionType.Gameplay, "StrandedToiletRefund")
+		Analytics.cashEarned(
+			player,
+			refund,
+			p.cash,
+			Enum.AnalyticsEconomyTransactionType.Gameplay,
+			"StrandedToiletRefund"
+		)
 	end
 	-- the tier is the value, so the dashboard shows how far up the ladder people get
 	Analytics.custom(player, "BuyTierUpgraded", p.buyTier)
@@ -412,7 +447,7 @@ end
 function EconomyService.reportOffline(player: Player)
 	local p = DataService.get(player)
 	if not p then return end
-	if p.lastLogout == 0 then return end   -- first-ever join awards nothing
+	if p.lastLogout == 0 then return end -- first-ever join awards nothing
 
 	local away = os.time() - p.lastLogout
 	if away < 0 then
@@ -492,7 +527,11 @@ function EconomyService.claimOffline(player: Player, doubled: boolean?)
 	-- is the pattern this codebase keeps getting caught by, so it does not go in
 	-- even where it would happen to work.
 	local kind
-	if doubled then kind = "x2" else kind = "x1" end
+	if doubled then
+		kind = "x2"
+	else
+		kind = "x1"
+	end
 	Analytics.custom(player, "OfflineClaim", grant.items, kind)
 	return true
 end
@@ -526,12 +565,16 @@ function EconomyService.groupReward(player: Player, worldPos: Vector3?)
 	p.lastGroupRewardAt = os.time()
 	p.cash += amount
 	DataService.push(player, { cash = p.cash })
-	Analytics.cashEarned(player, amount, p.cash, Enum.AnalyticsEconomyTransactionType.TimedReward, "GroupReward")
+	Analytics.cashEarned(
+		player,
+		amount,
+		p.cash,
+		Enum.AnalyticsEconomyTransactionType.TimedReward,
+		"GroupReward"
+	)
 	CashEvent:FireClient(player, { amount = amount, pos = worldPos })
 	toast(player, ("Thanks for joining! +%s"):format(Format.cash(amount)), "reward")
-	if worldPos then
-		require(script.Parent.VfxService).play("confetti", worldPos + Vector3.new(0, 2, 0))
-	end
+	if worldPos then require(script.Parent.VfxService).play("confetti", worldPos + Vector3.new(0, 2, 0)) end
 	return amount
 end
 
@@ -560,7 +603,13 @@ function EconomyService.freeMoney(player: Player)
 	p.cash += reward
 	CashEvent:FireClient(player, { amount = reward })
 	DataService.push(player, { cash = p.cash })
-	Analytics.cashEarned(player, reward, p.cash, Enum.AnalyticsEconomyTransactionType.TimedReward, "FreeMoneyChest")
+	Analytics.cashEarned(
+		player,
+		reward,
+		p.cash,
+		Enum.AnalyticsEconomyTransactionType.TimedReward,
+		"FreeMoneyChest"
+	)
 	toast(player, "Free money claimed!", "reward")
 	return reward
 end
@@ -572,17 +621,17 @@ end
 local function restore(player: Player)
 	local p = DataService.get(player)
 	if not p then return end
-	pending[player]    = tonumber(p.pendingCash) or 0
+	pending[player] = tonumber(p.pendingCash) or 0
 	queuePoops[player] = tonumber(p.queuePoops) or 0
 	queueItems[player] = tonumber(p.queueItems) or 0
-	queueCash[player]  = tonumber(p.queueCash) or 0
+	queueCash[player] = tonumber(p.queueCash) or 0
 end
 
 local function capture(player: Player, p)
 	p.pendingCash = pending[player] or 0
-	p.queuePoops  = queuePoops[player] or 0
-	p.queueItems  = queueItems[player] or 0
-	p.queueCash   = queueCash[player] or 0
+	p.queuePoops = queuePoops[player] or 0
+	p.queueItems = queueItems[player] or 0
+	p.queueCash = queueCash[player] or 0
 end
 
 function EconomyService.init()

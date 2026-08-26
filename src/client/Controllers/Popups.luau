@@ -57,12 +57,12 @@ local BASKET_ANCHOR = UDim2.fromScale(0.5, 0.80)
 -- Saturated top to bottom. These started at near-white and read as pastel once the
 -- black stroke was around them; a gradient on text wants real colour at both ends.
 local GAIN_GRADIENTS = {
-	ColorSequence.new(Color3.fromRGB(255, 225,  60), Color3.fromRGB(240, 120,   0)),
-	ColorSequence.new(Color3.fromRGB(120, 255, 120), Color3.fromRGB(  0, 175,  55)),
-	ColorSequence.new(Color3.fromRGB(110, 225, 255), Color3.fromRGB(  0, 120, 245)),
-	ColorSequence.new(Color3.fromRGB(255, 130, 210), Color3.fromRGB(215,   0, 140)),
-	ColorSequence.new(Color3.fromRGB(200, 150, 255), Color3.fromRGB(115,  30, 235)),
-	ColorSequence.new(Color3.fromRGB(255, 165, 100), Color3.fromRGB(230,  70,  10)),
+	ColorSequence.new(Color3.fromRGB(255, 225, 60), Color3.fromRGB(240, 120, 0)),
+	ColorSequence.new(Color3.fromRGB(120, 255, 120), Color3.fromRGB(0, 175, 55)),
+	ColorSequence.new(Color3.fromRGB(110, 225, 255), Color3.fromRGB(0, 120, 245)),
+	ColorSequence.new(Color3.fromRGB(255, 130, 210), Color3.fromRGB(215, 0, 140)),
+	ColorSequence.new(Color3.fromRGB(200, 150, 255), Color3.fromRGB(115, 30, 235)),
+	ColorSequence.new(Color3.fromRGB(255, 165, 100), Color3.fromRGB(230, 70, 10)),
 }
 
 function Popups.poopGain(amount: number, big: boolean?, tier: number?)
@@ -92,10 +92,10 @@ function Popups.poopGain(amount: number, big: boolean?, tier: number?)
 	})
 	t:Play()
 	local s = l:FindFirstChildOfClass("UIStroke")
-	if s then
-		TweenService:Create(s, TweenInfo.new(0.85), { Transparency = 1 }):Play()
-	end
-	t.Completed:Connect(function() l:Destroy() end)
+	if s then TweenService:Create(s, TweenInfo.new(0.85), { Transparency = 1 }):Play() end
+	t.Completed:Connect(function()
+		l:Destroy()
+	end)
 end
 
 -- one burst may cover many poops; stagger them so they read as a stream
@@ -121,7 +121,8 @@ function Popups.depositRain(count: number)
 	Audio.play("Confetti", { volume = 0.7 })
 
 	-- "Deposited X Poops!" above the basket
-	local banner = outlined(("Deposited %s Poops!"):format(Format.short(count)), 46, Color3.fromRGB(255, 236, 200))
+	local banner =
+		outlined(("Deposited %s Poops!"):format(Format.short(count)), 46, Color3.fromRGB(255, 236, 200))
 	banner.Size = UDim2.fromOffset(760, 64)
 	banner.AnchorPoint = Vector2.new(0.5, 0.5)
 	banner.Position = UDim2.fromScale(0.5, 0.74)
@@ -134,7 +135,9 @@ function Popups.depositRain(count: number)
 		local s = banner:FindFirstChildOfClass("UIStroke")
 		if s then TweenService:Create(s, TweenInfo.new(0.5), { Transparency = 1 }):Play() end
 		t:Play()
-		t.Completed:Connect(function() banner:Destroy() end)
+		t.Completed:Connect(function()
+			banner:Destroy()
+		end)
 	end)
 
 	-- poop icons raining down the screen
@@ -156,7 +159,9 @@ function Popups.depositRain(count: number)
 				ImageTransparency = 0.15,
 			})
 			t:Play()
-			t.Completed:Connect(function() icon:Destroy() end)
+			t.Completed:Connect(function()
+				icon:Destroy()
+			end)
 			if i % 4 == 0 then task.wait(0.06) end
 		end
 	end)
@@ -178,17 +183,20 @@ local function showDiscovery(info: any)
 
 	if icon then icon.Image = IconManifest.icon(info.key, true) end
 	if nameLabel then nameLabel.Text = info.name end
-	if line then
-		line.Text = ("You have discovered the %s %s!"):format(info.name, info.isMutation and "Mutation" or "Toilet")
-	end
+	if line then line.Text = ("You have discovered the %s Toilet!"):format(info.name) end
 
 	screen.Enabled = true
 	-- rarity escalates the size of the whole callout
 	local weight = info.weight or 1
 	local scale = UIKit.scaleOf(container)
 	scale.Scale = 0.3
-	TweenService:Create(scale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ Scale = weight }):Play()
+	TweenService
+		:Create(
+			scale,
+			TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Scale = weight }
+		)
+		:Play()
 
 	Audio.play("Discovery", { volume = math.min(1, 0.6 + weight * 0.25) })
 
@@ -206,8 +214,11 @@ local function showDiscovery(info: any)
 
 	task.wait(2.6 + weight * 0.4)
 	spinning = false
-	local out = TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-		{ Scale = 0.2 })
+	local out = TweenService:Create(
+		scale,
+		TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+		{ Scale = 0.2 }
+	)
 	out:Play()
 	out.Completed:Wait()
 	screen.Enabled = false
@@ -230,8 +241,8 @@ end
 
 -- ── toasts ──────────────────────────────────────────────────────────────
 local TOAST_COLOR = {
-	info   = Color3.fromRGB(255, 255, 255),
-	error  = Color3.fromRGB(255, 110, 110),
+	info = Color3.fromRGB(255, 255, 255),
+	error = Color3.fromRGB(255, 110, 110),
 	reward = Color3.fromRGB(120, 255, 140),
 }
 local activeToasts = 0
@@ -269,8 +280,12 @@ function Popups.confettiBurst(hooray: boolean?)
 	Audio.play("Confetti")
 	if hooray then Audio.play("Hooray") end
 	local COLORS = {
-		Color3.fromRGB(255, 90, 90), Color3.fromRGB(90, 200, 255), Color3.fromRGB(120, 255, 130),
-		Color3.fromRGB(255, 215, 60), Color3.fromRGB(220, 120, 255), Color3.fromRGB(255, 160, 60),
+		Color3.fromRGB(255, 90, 90),
+		Color3.fromRGB(90, 200, 255),
+		Color3.fromRGB(120, 255, 130),
+		Color3.fromRGB(255, 215, 60),
+		Color3.fromRGB(220, 120, 255),
+		Color3.fromRGB(255, 160, 60),
 	}
 	for _ = 1, 90 do
 		local p = Instance.new("Frame")
@@ -283,13 +298,19 @@ function Popups.confettiBurst(hooray: boolean?)
 		p.Parent = layer
 		local ang = math.random() * math.pi * 2
 		local dist = 0.25 + math.random() * 0.5
-		local t = TweenService:Create(p, TweenInfo.new(1.1 + math.random() * 0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-			Position = UDim2.fromScale(0.5 + math.cos(ang) * dist, 0.5 + math.sin(ang) * dist + 0.35),
-			Rotation = p.Rotation + math.random(-400, 400),
-			BackgroundTransparency = 1,
-		})
+		local t = TweenService:Create(
+			p,
+			TweenInfo.new(1.1 + math.random() * 0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+			{
+				Position = UDim2.fromScale(0.5 + math.cos(ang) * dist, 0.5 + math.sin(ang) * dist + 0.35),
+				Rotation = p.Rotation + math.random(-400, 400),
+				BackgroundTransparency = 1,
+			}
+		)
 		t:Play()
-		t.Completed:Connect(function() p:Destroy() end)
+		t.Completed:Connect(function()
+			p:Destroy()
+		end)
 	end
 end
 

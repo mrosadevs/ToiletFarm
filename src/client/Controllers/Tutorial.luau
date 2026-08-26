@@ -59,7 +59,10 @@ end
 
 -- a bobbing beacon over the pad the player should walk to
 local function setMarker(pos: Vector3?)
-	if marker then marker:Destroy() marker = nil end
+	if marker then
+		marker:Destroy()
+		marker = nil
+	end
 	if not pos then return end
 	local p = Instance.new("Part")
 	p.Name = "TutorialMarker"
@@ -82,7 +85,9 @@ local function setMarker(pos: Vector3?)
 	arrow.Text = "▼"
 	arrow.TextColor3 = Color3.fromRGB(255, 220, 60)
 	local s = Instance.new("UIStroke")
-	s.Thickness = 3; s.Color = Color3.new(0, 0, 0); s.Parent = arrow
+	s.Thickness = 3
+	s.Color = Color3.new(0, 0, 0)
+	s.Parent = arrow
 	arrow.Parent = bb
 	bb.Parent = p
 	p.Parent = workspace
@@ -153,20 +158,26 @@ local function setMarker(pos: Vector3?)
 						local at = from + dir * along
 
 						-- sit on whatever surface is under that point
-						local hit = workspace:Raycast(at + Vector3.new(0, 12, 0), Vector3.new(0, -60, 0), rayParams)
+						local hit =
+							workspace:Raycast(at + Vector3.new(0, 12, 0), Vector3.new(0, -60, 0), rayParams)
 						local y = hit and hit.Position.Y + 0.12 or from.Y
-						local base = CFrame.lookAt(Vector3.new(at.X, y, at.Z), Vector3.new(at.X, y, at.Z) + dir)
+						local base =
+							CFrame.lookAt(Vector3.new(at.X, y, at.Z), Vector3.new(at.X, y, at.Z) + dir)
 
 						-- fade in at the near end and out at the far end
 						local fade = math.clamp(math.min(f, 1 - f) * 5, 0, 1)
 						local bars = m:GetChildren()
 						if bars[1] then
-							(bars[1] :: BasePart).CFrame = base * CFrame.new(-0.62, 0, 0) * CFrame.Angles(0, math.rad(38), 0)
-							;(bars[1] :: BasePart).Transparency = 1 - 0.75 * fade
+							(bars[1] :: BasePart).CFrame = base
+								* CFrame.new(-0.62, 0, 0)
+								* CFrame.Angles(0, math.rad(38), 0);
+							(bars[1] :: BasePart).Transparency = 1 - 0.75 * fade
 						end
 						if bars[2] then
-							(bars[2] :: BasePart).CFrame = base * CFrame.new(0.62, 0, 0) * CFrame.Angles(0, math.rad(-38), 0)
-							;(bars[2] :: BasePart).Transparency = 1 - 0.75 * fade
+							(bars[2] :: BasePart).CFrame = base
+								* CFrame.new(0.62, 0, 0)
+								* CFrame.Angles(0, math.rad(-38), 0);
+							(bars[2] :: BasePart).Transparency = 1 - 0.75 * fade
 						end
 					end
 				end

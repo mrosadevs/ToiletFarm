@@ -110,7 +110,7 @@ local function compactSlots(player: Player): boolean
 			moved = true
 			PlotService.clearToilet(plot, from)
 			entry.slot = i
-			PlotService.buildToilet(plot, i, entry.tier, entry.mut)
+			PlotService.buildToilet(plot, i, entry.tier)
 		end
 		newTimers[i] = carried
 	end
@@ -150,9 +150,9 @@ function ToiletService.buy(player: Player, amount: number, unitPrice: number?)
 		end
 		-- place it first: if the stall cannot be built we must not charge for it,
 		-- or the player pays for a toilet that never appears
-		local entry = { tier = tier, mut = "None", slot = slot }
+		local entry = { tier = tier, slot = slot }
 		table.insert(p.toilets, entry)
-		if not PlotService.buildToilet(plot, slot, tier, "None") then
+		if not PlotService.buildToilet(plot, slot, tier) then
 			table.remove(p.toilets, #p.toilets)
 			warn(("[ToiletService] could not build tier %d in slot %d, purchase refunded"):format(tier, slot))
 			break
@@ -193,9 +193,9 @@ function ToiletService.grant(player: Player, tier: number): (number?, string?)
 	local slot = PlotService.freeSlot(player)
 	if not slot then return nil, "nospace" end
 
-	local entry = { tier = tier, mut = "None", slot = slot }
+	local entry = { tier = tier, slot = slot }
 	table.insert(p.toilets, entry)
-	if not PlotService.buildToilet(plot, slot, tier, "None") then
+	if not PlotService.buildToilet(plot, slot, tier) then
 		table.remove(p.toilets, #p.toilets)
 		warn(("[ToiletService] could not build granted tier %d in slot %d"):format(tier, slot))
 		return nil, "buildfailed"
@@ -207,11 +207,6 @@ function ToiletService.grant(player: Player, tier: number): (number?, string?)
 	compactSlots(player)
 	DataService.push(player)
 	return entry.slot
-end
-
-local MUT_RANK = { None = 0 }
-for i, name in ipairs(Config.MUTATION_ORDER) do
-	MUT_RANK[name] = i
 end
 
 -- one pass: merge every eligible triple, lowest tier first so cascades resolve upward
@@ -243,14 +238,6 @@ local function mergeOnce(player: Player): (number, number?)
 				table.insert(inputs, table.remove(group))
 			end
 
-			-- the result inherits the BEST mutation of the three inputs.
-			-- Losing a Rainbow to a merge feels awful and makes players stop merging,
-			-- which breaks the core loop — so never drop it.
-			local bestMut = "None"
-			for _, t in ipairs(inputs) do
-				if (MUT_RANK[t.mut] or 0) > (MUT_RANK[bestMut] or 0) then bestMut = t.mut end
-			end
-
 			-- keep the lowest slot for the result, free the other two
 			table.sort(inputs, function(a, b)
 				return a.slot < b.slot
@@ -269,8 +256,7 @@ local function mergeOnce(player: Player): (number, number?)
 			end
 
 			keep.tier = tier + 1
-			keep.mut = bestMut
-			PlotService.buildToilet(plot, keep.slot, keep.tier, keep.mut)
+			PlotService.buildToilet(plot, keep.slot, keep.tier)
 			timers[player] = timers[player] or {}
 			timers[player][keep.slot] = Config.dropInterval(keep.tier)
 			IndexService.discover(player, Config.assetId(keep.tier))
@@ -347,30 +333,6 @@ function ToiletService.mergeAll(player: Player)
 	return total
 end
 
--- ── mutations ────────────────────────────────────────────────────────────
-function ToiletService.applyMutation(player: Player, mut: string): boolean
-	local p = DataService.get(player)
-	local plot = PlotService.plotFor(player)
-	if not p or not plot or mut == "None" then return false end
-	if #p.toilets == 0 then
-		toast(player, "Buy a toilet first!", "error")
-		return false
-	end
-	-- apply to the highest-tier toilet that would gain the most from it
-	local best
-	for _, t in ipairs(p.toilets) do
-		if (MUT_RANK[t.mut] or 0) < (MUT_RANK[mut] or 0) then
-			if not best or t.tier > best.tier then best = t end
-		end
-	end
-	best = best or p.toilets[1]
-	best.mut = mut
-	PlotService.buildToilet(plot, best.slot, best.tier, mut)
-	IndexService.discover(player, "MUT_" .. mut)
-	DataService.push(player)
-	return true
-end
-
 -- ── the drop loop ────────────────────────────────────────────────────────
 function ToiletService.resetTimers(player: Player)
 	local p = DataService.get(player)
@@ -428,12 +390,9 @@ function ToiletService.init()
 					-- world-poop population is still bounded per plot in PoopService.drop.
 					local model = PlotService.toiletModel(plot, entry.slot)
 					if model then
-						local value = Config.poopValue(entry.tier)
-							* valueUp
-							* (Config.MUTATIONS[entry.mut] or 1)
-							* mult
+						local value = Config.poopValue(entry.tier) * valueUp * mult
 						local cf = model:GetPivot()
-						PoopService.drop(plot, cf.Position, entry.tier, entry.mut, value)
+						PoopService.drop(plot, cf.Position, entry.tier, value)
 					end
 				else
 					t[entry.slot] = left
@@ -448,7 +407,7 @@ function ToiletService.init()
 				local hasTriple = false
 				local count: { [number]: number } = {}
 				for _, e in ipairs(p.toilets) do
-					if e.mut == "None" and e.tier < Config.MAX_TIER then
+					if e.tier < Config.MAX_TIER then
 						count[e.tier] = (count[e.tier] or 0) + 1
 						if count[e.tier] >= Config.MERGE_COUNT then
 							hasTriple = true
@@ -456,7 +415,6 @@ function ToiletService.init()
 						end
 					end
 				end
-				-- never auto-merge a mutated toilet without asking
 				if hasTriple and PassService.has(player, "AutoMerge") then ToiletService.mergeAll(player) end
 			end
 		end

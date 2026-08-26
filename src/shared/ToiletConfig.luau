@@ -4,17 +4,17 @@
 
 local Config = {}
 
-Config.MERGE_COUNT  = 3
+Config.MERGE_COUNT = 3
 -- Two invariants hold this economy together, and both are one-directional:
 --   INCOME_RATIO > MERGE_COUNT  or merging three toilets loses you income.
 --   INCOME_RATIO > COST_RATIO   or each tier costs more than it can ever earn,
 --                                 so climbing tiers is a trap and the game stalls.
 -- COST_RATIO used to be 4.0 against an income ratio of 3.6, i.e. inverted.
 Config.INCOME_RATIO = 3.6
-Config.COST_RATIO   = 3.3
-Config.BASE_INCOME  = 0.5   -- cash/sec at T1
-Config.BASE_COST   = 10
-Config.MAX_TIER     = 30
+Config.COST_RATIO = 3.3
+Config.BASE_INCOME = 0.5 -- cash/sec at T1
+Config.BASE_COST = 10
+Config.MAX_TIER = 30
 
 -- Flat drop rate for every tier. A tier's earnings are anchored by
 -- incomePerSecond(), and poopValue() is derived from it, so this interval does
@@ -29,12 +29,36 @@ Config.DROP_INTERVAL = 3.0
 Config.WALK_SPEED = 20
 
 Config.NAMES = {
-	"PorcelainStarter", "PrimitivePit", "MossyBowl", "RustyPan", "DumpsterDeluxe",
-	"BrickThrone", "CopperComode", "SteelShrine", "PyramidToilet", "FreshFlow",
-	"BurgerBowl", "PlumberPipe", "BogBlossom", "GoldenFlush", "CinderSeat",
-	"VoltSeat", "ObsidianOutlet", "DiamondSeat", "CodeCube", "NeonNomad",
-	"MicroThrone", "MegaBowl", "StarChart", "UfoToilet", "NebulaPorcelain",
-	"QuantumQuay", "ArcaneRunestool", "EternalThrone", "VoidVoyager", "AscensionAlter",
+	"PorcelainStarter",
+	"PrimitivePit",
+	"MossyBowl",
+	"RustyPan",
+	"DumpsterDeluxe",
+	"BrickThrone",
+	"CopperComode",
+	"SteelShrine",
+	"PyramidToilet",
+	"FreshFlow",
+	"BurgerBowl",
+	"PlumberPipe",
+	"BogBlossom",
+	"GoldenFlush",
+	"CinderSeat",
+	"VoltSeat",
+	"ObsidianOutlet",
+	"DiamondSeat",
+	"CodeCube",
+	"NeonNomad",
+	"MicroThrone",
+	"MegaBowl",
+	"StarChart",
+	"UfoToilet",
+	"NebulaPorcelain",
+	"QuantumQuay",
+	"ArcaneRunestool",
+	"EternalThrone",
+	"VoidVoyager",
+	"AscensionAlter",
 }
 
 -- "PorcelainStarter" -> "Porcelain Starter"
@@ -42,9 +66,7 @@ local displayCache = {}
 function Config.displayName(tier: number): string
 	local raw = Config.NAMES[tier]
 	if not raw then return "???" end
-	if not displayCache[raw] then
-		displayCache[raw] = (raw:gsub("(%l)(%u)", "%1 %2"))
-	end
+	if not displayCache[raw] then displayCache[raw] = (raw:gsub("(%l)(%u)", "%1 %2")) end
 	return displayCache[raw]
 end
 
@@ -67,7 +89,7 @@ end
 --   price    $5    $7   $10   $24   $46  $1,241
 -- price = base * (1 + COEFF * total^EXPONENT) reproduces every one of those to
 -- within a few percent. Retune with these two constants alone.
-Config.BUY_SCALE_COEFF    = 0.4366
+Config.BUY_SCALE_COEFF = 0.4366
 Config.BUY_SCALE_EXPONENT = 0.871
 
 -- ── Production price scaling ────────────────────────────────
@@ -93,7 +115,7 @@ Config.BUY_SCALE_EXPONENT = 0.871
 -- 100 costing a couple of minutes of production -- still a real purchase, not the
 -- pocket change the farm-size curve alone charges a rich player.
 Config.BUY_PRODUCTION_SECONDS = 120
-Config.BUY_PRODUCTION_BATCH   = 100
+Config.BUY_PRODUCTION_BATCH = 100
 
 function Config.buyCostFor(tier: number, totalToilets: number, poopRate: number?): number
 	local markup = 1 + Config.BUY_SCALE_COEFF * math.max(totalToilets, 0) ^ Config.BUY_SCALE_EXPONENT
@@ -134,54 +156,48 @@ function Config.poopCount(tier: number): number
 end
 
 function Config.rarityOf(tier: number): string
-	if tier <= 5 then return "Common"
-	elseif tier <= 10 then return "Uncommon"
-	elseif tier <= 15 then return "Rare"
-	elseif tier <= 20 then return "Epic"
-	elseif tier <= 25 then return "Legendary"
-	elseif tier <= 29 then return "Mythic"
-	else return "Divine" end
+	if tier <= 5 then
+		return "Common"
+	elseif tier <= 10 then
+		return "Uncommon"
+	elseif tier <= 15 then
+		return "Rare"
+	elseif tier <= 20 then
+		return "Epic"
+	elseif tier <= 25 then
+		return "Legendary"
+	elseif tier <= 29 then
+		return "Mythic"
+	else
+		return "Divine"
+	end
 end
 
 Config.RARITY_COLORS = {
-	Common    = Color3.fromRGB(190, 190, 190),
-	Uncommon  = Color3.fromRGB( 90, 220, 100),
-	Rare      = Color3.fromRGB( 70, 160, 255),
-	Epic      = Color3.fromRGB(190, 100, 255),
-	Legendary = Color3.fromRGB(255, 190,  50),
-	Mythic    = Color3.fromRGB(255,  85,  85),
-	Divine    = Color3.fromRGB(255, 255, 255),
+	Common = Color3.fromRGB(190, 190, 190),
+	Uncommon = Color3.fromRGB(90, 220, 100),
+	Rare = Color3.fromRGB(70, 160, 255),
+	Epic = Color3.fromRGB(190, 100, 255),
+	Legendary = Color3.fromRGB(255, 190, 50),
+	Mythic = Color3.fromRGB(255, 85, 85),
+	Divine = Color3.fromRGB(255, 255, 255),
 }
 
 -- how big the discovery popup gets, by rarity band
 Config.DISCOVERY_WEIGHT = {
-	Common = 1, Uncommon = 1, Rare = 1.1, Epic = 1.2,
-	Legendary = 1.35, Mythic = 1.5, Divine = 1.7,
+	Common = 1,
+	Uncommon = 1,
+	Rare = 1.1,
+	Epic = 1.2,
+	Legendary = 1.35,
+	Mythic = 1.5,
+	Divine = 1.7,
 }
 
 -- model name in ServerStorage.Assets: "T07_CopperComode"
 function Config.assetId(tier: number): string
 	return string.format("T%02d_%s", tier, Config.NAMES[tier])
 end
-
--- ── Mutations ───────────────────────────────────────────────────────────────
-Config.MUTATIONS = {
-	None    = 1,   Bubble = 1.5, Snow   = 2,  Slime  = 3,
-	Gilded  = 5,   Inferno = 8,  Shadow = 15, Vortex = 25, Rainbow = 50,
-}
--- ordered, so the Index shows them in power order
-Config.MUTATION_ORDER = { "Bubble", "Snow", "Slime", "Gilded", "Inferno", "Shadow", "Vortex", "Rainbow" }
-
-Config.MUTATION_COLORS = {
-	Bubble  = Color3.fromRGB(120, 200, 255),
-	Snow    = Color3.fromRGB(235, 245, 255),
-	Slime   = Color3.fromRGB(110, 230,  90),
-	Gilded  = Color3.fromRGB(255, 200,   0),
-	Inferno = Color3.fromRGB(255, 110,  30),
-	Shadow  = Color3.fromRGB( 60,  55,  75),
-	Vortex  = Color3.fromRGB(170,  60, 255),
-	Rainbow = Color3.fromRGB(255,   0, 200),
-}
 
 -- ── Lucky Blocks ────────────────────────────────────────────────────────────
 -- A block awards a TOILET, not a mutation. `roll` maps a tier OFFSET to a weight:
@@ -191,21 +207,46 @@ Config.MUTATION_COLORS = {
 -- `robux` is advisory only — the price actually shown and charged is read live from
 -- the dev product via PassService.productPrice(), so this can never drift out of sync.
 Config.LUCKY_BLOCKS = {
-	{ id = "Basic",  model = "BasicLuckyBlock2",  icon = "rbxassetid://94087721134152",  robux = 25,
-	  color = Color3.fromRGB(255, 200, 40),
-	  roll = { [0]=60, [1]=25, [2]=10, [3]=4, [4]=1 } },
-	{ id = "Green",  model = "GreenLuckyBlock2",  icon = "rbxassetid://76457194119026",  robux = 60,
-	  color = Color3.fromRGB(90, 230, 90),
-	  roll = { [0]=40, [1]=25, [2]=20, [3]=10, [4]=4, [5]=1 } },
-	{ id = "Ice",    model = "IceLuckyBlock3",    icon = "rbxassetid://137365700048410", robux = 120,
-	  color = Color3.fromRGB(140, 225, 255),
-	  roll = { [0]=25, [1]=20, [2]=25, [3]=15, [4]=10, [5]=4, [6]=1 } },
-	{ id = "Purple", model = "PurpleLuckyBlock2", icon = "rbxassetid://77803120887253", robux = 250,
-	  color = Color3.fromRGB(190, 90, 255),
-	  roll = { [0]=10, [1]=10, [2]=20, [3]=25, [4]=20, [5]=10, [6]=4, [7]=1 } },
-	{ id = "White",  model = "WhiteLuckyBlock2",  icon = "rbxassetid://101024301124546", robux = 599,
-	  color = Color3.fromRGB(255, 255, 255),
-	  roll = { [1]=5, [2]=10, [3]=15, [4]=25, [5]=25, [6]=12, [7]=6, [8]=2 } },
+	{
+		id = "Basic",
+		model = "BasicLuckyBlock2",
+		icon = "rbxassetid://94087721134152",
+		robux = 25,
+		color = Color3.fromRGB(255, 200, 40),
+		roll = { [0] = 60, [1] = 25, [2] = 10, [3] = 4, [4] = 1 },
+	},
+	{
+		id = "Green",
+		model = "GreenLuckyBlock2",
+		icon = "rbxassetid://76457194119026",
+		robux = 60,
+		color = Color3.fromRGB(90, 230, 90),
+		roll = { [0] = 40, [1] = 25, [2] = 20, [3] = 10, [4] = 4, [5] = 1 },
+	},
+	{
+		id = "Ice",
+		model = "IceLuckyBlock3",
+		icon = "rbxassetid://137365700048410",
+		robux = 120,
+		color = Color3.fromRGB(140, 225, 255),
+		roll = { [0] = 25, [1] = 20, [2] = 25, [3] = 15, [4] = 10, [5] = 4, [6] = 1 },
+	},
+	{
+		id = "Purple",
+		model = "PurpleLuckyBlock2",
+		icon = "rbxassetid://77803120887253",
+		robux = 250,
+		color = Color3.fromRGB(190, 90, 255),
+		roll = { [0] = 10, [1] = 10, [2] = 20, [3] = 25, [4] = 20, [5] = 10, [6] = 4, [7] = 1 },
+	},
+	{
+		id = "White",
+		model = "WhiteLuckyBlock2",
+		icon = "rbxassetid://101024301124546",
+		robux = 599,
+		color = Color3.fromRGB(255, 255, 255),
+		roll = { [1] = 5, [2] = 10, [3] = 15, [4] = 25, [5] = 25, [6] = 12, [7] = 6, [8] = 2 },
+	},
 }
 
 -- highest offset any block can roll, so callers can iterate deterministically
@@ -231,7 +272,9 @@ function Config.rollLuckyOffset(blockId: string, luck: number?): number
 		return off > 0 and w * boost or w
 	end
 	local total = 0
-	for off = 0, Config.LUCKY_MAX_OFFSET do total += (weight(off) or 0) end
+	for off = 0, Config.LUCKY_MAX_OFFSET do
+		total += (weight(off) or 0)
+	end
 	if total <= 0 then return 0 end
 	local r = math.random() * total
 	for off = 0, Config.LUCKY_MAX_OFFSET do
@@ -271,10 +314,10 @@ end
 -- The cash share is per-block, not flat: on a flat share a rich player pays the
 -- same for a Basic as for a White, because the share swamps the EV term and the
 -- rarity stops mattering. Rank 1 asks 15% of the balance, rank 5 asks 45%.
-Config.LUCKY_EV_MARKUP       = 1.5
-Config.LUCKY_CASH_SHARE      = 0.15
-Config.LUCKY_CASH_SHARE_STEP = 0.5   -- +50% of the base share per rank
-Config.LUCKY_MIN_COST        = 100
+Config.LUCKY_EV_MARKUP = 1.5
+Config.LUCKY_CASH_SHARE = 0.15
+Config.LUCKY_CASH_SHARE_STEP = 0.5 -- +50% of the base share per rank
+Config.LUCKY_MIN_COST = 100
 
 function Config.luckyRank(blockId: string): number
 	for i, b in ipairs(Config.LUCKY_BLOCKS) do
@@ -319,18 +362,20 @@ end
 
 -- how often a block spawns on a claimed plot, and how long it sits before despawning
 Config.LUCKY_SPAWN_INTERVAL = { min = 150, max = 300 }
-Config.LUCKY_DESPAWN        = 120
+Config.LUCKY_DESPAWN = 120
 -- which block spawns, weighted by the player's rebirth level
 function Config.rollLuckyBlockId(rebirths: number): string
 	local w = {
-		Basic  = 100,
-		Green  = 10 + rebirths * 12,
-		Ice    = math.max(0, (rebirths - 1) * 8),
+		Basic = 100,
+		Green = 10 + rebirths * 12,
+		Ice = math.max(0, (rebirths - 1) * 8),
 		Purple = math.max(0, (rebirths - 3) * 5),
-		White  = math.max(0, (rebirths - 5) * 3),
+		White = math.max(0, (rebirths - 5) * 3),
 	}
 	local total = 0
-	for _, v in pairs(w) do total += v end
+	for _, v in pairs(w) do
+		total += v
+	end
 	local r = math.random() * total
 	for _, b in ipairs(Config.LUCKY_BLOCKS) do
 		r -= (w[b.id] or 0)
@@ -344,21 +389,23 @@ Config.FLUSH_METER = {
 	-- Slow. At 30s the hologram bar was visibly racing and the number changed before
 	-- a player could do anything about it, which makes it noise rather than a thing
 	-- you plan a run around.
-	period = 150,         -- seconds between re-rolls
-	warn   = 15,          -- countdown shown before the re-roll
-	table  = {
-		{ mult = 0.5,  weight = 10 },
+	period = 150, -- seconds between re-rolls
+	warn = 15, -- countdown shown before the re-roll
+	table = {
+		{ mult = 0.5, weight = 10 },
 		{ mult = 0.75, weight = 15 },
-		{ mult = 1.0,  weight = 30 },
+		{ mult = 1.0, weight = 30 },
 		{ mult = 1.25, weight = 20 },
-		{ mult = 1.5,  weight = 15 },
-		{ mult = 2.0,  weight = 10 },
+		{ mult = 1.5, weight = 15 },
+		{ mult = 2.0, weight = 10 },
 	},
 }
 
 function Config.rollFlushMeter(): number
 	local total = 0
-	for _, e in ipairs(Config.FLUSH_METER.table) do total += e.weight end
+	for _, e in ipairs(Config.FLUSH_METER.table) do
+		total += e.weight
+	end
 	local r = math.random() * total
 	for _, e in ipairs(Config.FLUSH_METER.table) do
 		r -= e.weight
@@ -386,14 +433,14 @@ end
 -- pad and the cash packs. Treat these as a ceiling on pacing, not a promise, and
 -- retune from the simulation rather than by nudging single rows.
 Config.REBIRTHS = {
-	{ cost = 19e3,    mult = 2,    tokens = 1  },
-	{ cost = 400e3,   mult = 5,    tokens = 2  },
-	{ cost = 3.3e6,   mult = 12,   tokens = 3  },
-	{ cost = 19e6,    mult = 30,   tokens = 5  },
-	{ cost = 110e6,   mult = 80,   tokens = 8  },
-	{ cost = 640e6,   mult = 220,  tokens = 12 },
-	{ cost = 4.6e9,   mult = 650,  tokens = 18 },
-	{ cost = 32e9,    mult = 2000, tokens = 25 },
+	{ cost = 19e3, mult = 2, tokens = 1 },
+	{ cost = 400e3, mult = 5, tokens = 2 },
+	{ cost = 3.3e6, mult = 12, tokens = 3 },
+	{ cost = 19e6, mult = 30, tokens = 5 },
+	{ cost = 110e6, mult = 80, tokens = 8 },
+	{ cost = 640e6, mult = 220, tokens = 12 },
+	{ cost = 4.6e9, mult = 650, tokens = 18 },
+	{ cost = 32e9, mult = 2000, tokens = 25 },
 }
 Config.MAX_REBIRTH = #Config.REBIRTHS
 
@@ -449,11 +496,11 @@ end
 -- ── Upgrades (cash-bought, wiped on rebirth) ────────────────────────────────
 Config.UPGRADE_COST_RATIO = 3.5
 Config.UPGRADES = {
-	FlushSpeed     = { levels = 10, base = 1000, per = 0.03, label = "Flush Speed",     suffix = "%% faster" },
-	PoopValue      = { levels = 10, base = 2000, per = 0.10, label = "Poop Value",      suffix = "%% value"  },
-	SepticCapacity = { levels = 10, base = 500,  per = 150,  label = "Septic Capacity", suffix = " carry"    },
-	CollectRadius  = { levels = 10, base = 750,  per = 2,    label = "Collect Radius",  suffix = " studs"    },
-	PlotSlots      = { levels = 12, base = 5000, per = 1,    label = "Plot Slots",      suffix = " slot"     },
+	FlushSpeed = { levels = 10, base = 1000, per = 0.03, label = "Flush Speed", suffix = "%% faster" },
+	PoopValue = { levels = 10, base = 2000, per = 0.10, label = "Poop Value", suffix = "%% value" },
+	SepticCapacity = { levels = 10, base = 500, per = 150, label = "Septic Capacity", suffix = " carry" },
+	CollectRadius = { levels = 10, base = 750, per = 2, label = "Collect Radius", suffix = " studs" },
+	PlotSlots = { levels = 12, base = 5000, per = 1, label = "Plot Slots", suffix = " slot" },
 }
 
 -- Processing is levelled separately (see Config.PROCESSING) because its growth
@@ -471,12 +518,12 @@ end
 -- rate you upgrade with the "+X Per Second" pad; the cash lands on the Collect Cash
 -- pad as it clears. "Finish Now" skips the wait for Robux. Resets on rebirth.
 Config.PROCESSING = {
-	baseRate   = 1,      -- poops/sec at level 0
-	rateGrowth = 4,      -- x4 per level, so the sign reaches the 999M range late
-	baseCost   = 500,
+	baseRate = 1, -- poops/sec at level 0
+	rateGrowth = 4, -- x4 per level, so the sign reaches the 999M range late
+	baseCost = 500,
 	costGrowth = 4.2,
-	maxLevel   = 25,
-	friendBoost = 0.10,  -- +10% rate per friend in the server
+	maxLevel = 25,
+	friendBoost = 0.10, -- +10% rate per friend in the server
 	maxFriendBoost = 1.0,
 }
 
@@ -499,7 +546,7 @@ end
 -- full 48-stall plot ~16/sec:
 --   250 base  -> ~31s of runway on a starter farm
 --   1,750 max -> ~110s at the late-game rate of ~16 poops/sec across 48 stalls
-Config.BASE_CARRY  = 250
+Config.BASE_CARRY = 250
 Config.CARRY_PER_LEVEL = 150
 Config.BASE_RADIUS = 6
 
@@ -532,8 +579,8 @@ function Config.plotSlots(rebirths: number, purchased: number, passSlots: number
 end
 
 -- ── Offline earnings ────────────────────────────────────────────────────────
-Config.OFFLINE_RATE     = 0.40
-Config.OFFLINE_CAP      = 8 * 60 * 60
+Config.OFFLINE_RATE = 0.40
+Config.OFFLINE_CAP = 8 * 60 * 60
 Config.OFFLINE_CAP_PASS = 12 * 60 * 60
 Config.OFFLINE_MIN_SHOW = 60
 
@@ -557,8 +604,8 @@ end
 -- number is either meaningless by the second rebirth or absurd on the first day.
 Config.GROUP_REWARD = {
 	cooldown = 600,
-	floor    = 500,    -- what a brand new farm gets
-	share    = 0.12,   -- ...or this much of the balance, whichever is larger
+	floor = 500, -- what a brand new farm gets
+	share = 0.12, -- ...or this much of the balance, whichever is larger
 }
 
 function Config.groupReward(cash: number): number
@@ -576,9 +623,9 @@ end
 -- Pack 2 is always 40x pack 1; pack 3 is 20x pack 2. Pack 1 is sublinear in the
 -- balance (the multiplier shrinks as you get richer), which both points agree on.
 Config.CASH_PACKS = {
-	coefficient = 140.5,   -- pack1 = coefficient * cash^exponent (fits both refs to <1%)
-	exponent    = 0.845,
-	floor       = 500,     -- so a broke player still gets something worth buying
+	coefficient = 140.5, -- pack1 = coefficient * cash^exponent (fits both refs to <1%)
+	exponent = 0.845,
+	floor = 500, -- so a broke player still gets something worth buying
 	stepSmallToMedium = 40,
 	stepMediumToLarge = 20,
 }
@@ -587,24 +634,39 @@ Config.CASH_PACKS = {
 function Config.cashPackAmount(cash: number, index: number): number
 	local c = Config.CASH_PACKS
 	local base = math.max(c.floor, c.coefficient * math.max(cash, 0) ^ c.exponent)
-	if index >= 2 then base *= c.stepSmallToMedium end
-	if index >= 3 then base *= c.stepMediumToLarge end
+	if index >= 2 then
+		base *= c.stepSmallToMedium
+	end
+	if index >= 3 then
+		base *= c.stepMediumToLarge
+	end
 	return math.floor(base)
 end
 
 -- ── Flush Token meta shop ───────────────────────────────────────────────────
 Config.TOKEN_PERKS = {
-	{ id = "RichDiet",    cost = 3,  max = 10, label = "Rich Diet",   desc = "+5%% global income" },
-	{ id = "ExtraPlot",   cost = 5,  max = 6,  label = "Extra Plot",  desc = "+1 starting plot slot" },
-	{ id = "HeadStart",   cost = 8,  max = 1,  label = "Head Start",  desc = "Start each rebirth with 1 cap-tier toilet" },
-	{ id = "LuckyGut",    cost = 10, max = 5,  label = "Lucky Gut",   desc = "+10%% Lucky Block luck" },
-	{ id = "AutoCollect", cost = 25, max = 1,  label = "Auto-Collect", desc = "Poop auto-banks at half rate" },
+	{ id = "RichDiet", cost = 3, max = 10, label = "Rich Diet", desc = "+5%% global income" },
+	{ id = "ExtraPlot", cost = 5, max = 6, label = "Extra Plot", desc = "+1 starting plot slot" },
+	{
+		id = "HeadStart",
+		cost = 8,
+		max = 1,
+		label = "Head Start",
+		desc = "Start each rebirth with 1 cap-tier toilet",
+	},
+	{ id = "LuckyGut", cost = 10, max = 5, label = "Lucky Gut", desc = "+10%% Lucky Block luck" },
+	{
+		id = "AutoCollect",
+		cost = 25,
+		max = 1,
+		label = "Auto-Collect",
+		desc = "Poop auto-banks at half rate",
+	},
 }
 
 -- ── Index completion rewards ────────────────────────────────────────────────
-Config.INDEX_TOILET_REWARD_EVERY = 5   -- toilets discovered per Flush Token
-Config.INDEX_ALL_TOILETS_BONUS   = 0.25 -- +25%% income
-Config.INDEX_ALL_MUTATIONS_LUCK  = 0.10 -- +10%% lucky block luck
+Config.INDEX_TOILET_REWARD_EVERY = 5 -- toilets discovered per Flush Token
+Config.INDEX_ALL_TOILETS_BONUS = 0.25 -- +25%% income
 
 -- ── Deposit / carry ─────────────────────────────────────────────────────────
 Config.PICKUP_COOLDOWN = 0.05
