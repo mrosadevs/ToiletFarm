@@ -463,10 +463,15 @@ function PlotService.buildToilet(plot: Model, slot: number, tier: number): Model
 	model.Parent = stall
 	placed[plot][slot] = model
 
-	-- Pop-in bounce, played on the client. The model is left at its fitted scale, so
-	-- a client that never runs the animation -- one that streamed the stall in
-	-- afterwards, or a client still loading -- sees a correctly sized toilet anyway.
-	cueReveal(model, workspace:GetServerTimeNow())
+	-- No reveal animation on the toilet itself, deliberately. It was moved to the
+	-- client to stop the server writing ~900 replicated properties per toilet, but
+	-- Model:ScaleTo is a RELATIVE transform and the client was applying it while
+	-- these PivotTo and NameAnchor writes were still replicating -- which tore the
+	-- models apart on the client while the server's copy stayed correct. The stall
+	-- fading in carries the reveal on its own; see WorldFx.onCue.
+	--
+	-- The toilet is placed at its final fitted scale in a single write, which is
+	-- what removed the per-frame server cost in the first place.
 	return model
 end
 

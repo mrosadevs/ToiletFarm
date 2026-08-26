@@ -105,7 +105,6 @@ local REVEAL_AT = "TfRevealAt"
 local REVEAL_GRACE = 2
 
 local STALL_FADE = 0.35
-local POP_TIME = 0.32
 
 -- one animation per instance, so a re-cue supersedes rather than fights
 local revealRun: { [Instance]: number } = {}
@@ -178,31 +177,24 @@ local function cancelStallFade(stall: Model)
 	end
 end
 
--- The toilet's overshoot-and-settle bounce. ScaleTo is absolute against the
--- model's ORIGINAL authored size, so this animates towards the FITTED scale the
--- server left it at, never towards 1.
-local function playToiletPop(model: Model)
-	local gen = generation(model)
-	local fitted = model:GetScale()
-	task.spawn(function()
-		local t0 = os.clock()
-		while revealRun[model] == gen do
-			local a = (os.clock() - t0) / POP_TIME
-			if a >= 1 or model.Parent == nil then break end
-			local e = 1 + 2.2 * (1 - a) ^ 2 * math.sin(a * 9)
-			model:ScaleTo(math.max(0.01, fitted * a * e))
-			task.wait()
-		end
-		if model.Parent and revealRun[model] == gen then model:ScaleTo(fitted) end
-	end)
-end
-
+-- Only stalls animate. A toilet is NOT scaled from here: Model:ScaleTo applies a
+-- RELATIVE transform to the parts' current positions, and the server is still
+-- replicating that model's part CFrames from PivotTo and the NameAnchor it adds
+-- when the cue lands. Every interleaved server write arrived on parts the client
+-- had already shrunk, and the next frame scaled those positions again -- so the
+-- parts drifted apart for good and the closing ScaleTo restored the scale NUMBER
+-- but not the layout. Toilets came out as huge scattered slabs across the farm,
+-- on the client only; the server's geometry was always correct.
+--
+-- Passing the target scale down from the server does not fix it, because the race
+-- is on the part CFrames rather than on the scale. The toilet is placed at its
+-- final size by the server in a single write and left alone.
 local function onCue(inst: Instance)
 	if not inst:IsA("Model") then return end
-	if inst.Name == "Toilet" then
-		-- a toilet is only ever cued once, at the moment it is placed
-		if fresh(inst) then playToiletPop(inst) end
-	elseif inst.Name:sub(1, 6) == "Stall_" then
+	if inst.Name:sub(1, 6) == "Stall_" then
+		-- Transparency only. Each frame writes an ABSOLUTE value and the last write
+		-- is a literal 0, so an interleaved server write cannot accumulate -- which
+		-- is what makes this one safe where scaling was not.
 		if fresh(inst) then
 			playStallFade(inst)
 		else
