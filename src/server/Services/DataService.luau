@@ -51,7 +51,7 @@ function DataService.default()
 		perks[p.id] = 0
 	end
 	return {
-		cash = 10,
+		cash = Config.startingCash(),
 		-- `poops` is the total VALUE carried (what the basket shows, e.g. 162.21K).
 		-- `poopItems` is how many physical poops that is, and it's the count the
 		-- Septic Capacity cap applies to — one T30 poop is worth 10Qa, so capping

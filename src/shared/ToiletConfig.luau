@@ -127,6 +127,32 @@ function Config.buyCostFor(tier: number, totalToilets: number, poopRate: number?
 	return math.floor(math.max(curve, floor))
 end
 
+-- ── The opening stake ───────────────────────────────────────────────────────
+-- What a brand new profile starts with, and DERIVED rather than picked: it is
+-- exactly what the tutorial's "Get 3 Toilets" step costs at the farm-size prices
+-- ($10 + $14 + $17 = $41 at the current constants).
+--
+-- The old stake was a flat $10, which bought the first toilet and left nothing.
+-- Toilets two and three then had to be earned at the worst rate the game ever
+-- runs -- one Tier 1 toilet making $0.50/sec into a queue draining at 1/sec, with
+-- a walk to the septic tank and back between each purchase -- so the opening put
+-- a couple of minutes of the dullest grind in the game in the first three minutes
+-- of play, which is exactly where a player decides whether to stay.
+--
+-- The stake now covers the whole tutorial, so it teaches the loop once and then
+-- lets the player expand instead of repeating it for pocket change. Deriving it
+-- means retuning BASE_COST or the buy curve moves the stake with them, so the
+-- opening cannot silently go back to being unaffordable.
+Config.TUTORIAL_TOILETS = 3
+
+function Config.startingCash(): number
+	local total = 0
+	for owned = 0, Config.TUTORIAL_TOILETS - 1 do
+		total += Config.buyCostFor(1, owned)
+	end
+	return total
+end
+
 function Config.dropInterval(_tier: number): number
 	return Config.DROP_INTERVAL
 end

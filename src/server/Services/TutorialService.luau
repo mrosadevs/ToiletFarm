@@ -34,10 +34,13 @@ TutorialService.STEPS = {
 	},
 	{ id = "deposit", title = "Deposit your Poops", goal = 1, target = "DepositPad" },
 	{ id = "cash", title = "Collect your Cash!", goal = 1, target = "CollectCashPad" },
+	-- Goal and the opening stake come off the same constant: Config.startingCash()
+	-- is exactly what this many Tier 1 toilets cost, so this step can never ask for
+	-- more toilets than a fresh profile can pay for.
 	{
 		id = "three",
-		title = "Get 3 Toilets",
-		goal = 3,
+		title = ("Get %d Toilets"):format(Config.TUTORIAL_TOILETS),
+		goal = Config.TUTORIAL_TOILETS,
 		target = "BuyButton",
 		targetName = "BuyButton_1",
 	},
