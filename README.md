@@ -119,14 +119,6 @@ ToiletFarm/
 └── 📄 CLAUDE.md                # always-on rules for AI-assisted work
 ```
 
-## ⚠️ Before You Edit
-
-Read **`CLAUDE.md`** (always-on rules) before picking up unfinished work.
-
-Migrated from Studio on **2026-08-20**. The migration commit is pure movement — all 31 scripts byte-identical, verified by rebuilding the tree and diffing every source against the original place.
-
-**Do not edit script source in Studio.** Rojo owns `ReplicatedStorage.Shared`, `ServerScriptService`, and `StarterPlayerScripts` with `$ignoreUnknownInstances: false` — it owns those containers completely and deletions propagate. Everything else (Terrain, `Workspace.Plots`, `Workspace.Hub`, `StarterGui`, `ServerStorage.Assets`, Lighting) is Studio-authored and stays there.
-
 ---
 
 <p align="center">Made with 👻 by <a href="https://github.com/mrosadevs">mrosadevs</a> · Built with Rojo, not vibes</p>
